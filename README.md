@@ -21,6 +21,12 @@ Apagar o original é irreversível. Por isso:
 
 Grava na tabela `duplicatas` do `acervo-index`. Também exporta relatório JSON com `duplicate_groups`, espaço recuperável e o representante de cada grupo.
 
+## Estado
+
+**Esqueleto.** Nada do descrito acima está implementado neste repositório — o texto define o desenho, não o que já roda.
+
+A implementação de referência está em `C:\CLAUDE\dedup_fase1.py` … `dedup_fase8.py`, oito iterações de protótipo. A reescrita parte do que ficou de pé, não da cópia.
+
 ## Licença e monetização
 
 Código fechado, sob Obsn Studios.
