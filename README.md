@@ -25,7 +25,7 @@ Grava na tabela `duplicatas` do `acervo-index`. Também exporta relatório JSON 
 
 **Esqueleto.** Nada do descrito acima está implementado neste repositório — o texto define o desenho, não o que já roda.
 
-A implementação de referência está em `C:\CLAUDE\dedup_fase1.py` … `dedup_fase8.py`, oito iterações de protótipo. A reescrita parte do que ficou de pé, não da cópia.
+A implementação de referência são as oito iterações do protótipo de origem, mantido fora deste repositório. A reescrita parte do que ficou de pé, não da cópia.
 
 ## Licença e monetização
 
