@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "acervo-dedup"
+version = "0.1.0"
+description = "Detecção de redundância em acervos grandes: duas passadas (exata + perceptual), isolamento explícito, nunca apagamento."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "PyYAML>=6.0",
+]
+
+[project.scripts]
+acervo-dedup = "acervo_dedup.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

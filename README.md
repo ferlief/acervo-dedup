@@ -23,9 +23,14 @@ Grava na tabela `duplicatas` do `acervo`. Também exporta relatório JSON com `d
 
 ## Estado
 
-**Esqueleto.** Nada do descrito acima está implementado neste repositório — o texto define o desenho, não o que já roda.
+**Implementado.** CLI em Python (`src/acervo_dedup/`), portado das oito iterações do protótipo de origem (`acervo-prototipo/dedup_fase1.py` … `dedup_fase8.py`), não copiado — a passada exata e a perceptual usam a mesma lógica testada em disco real (triagem por tamanho, SHA-256 em blocos, hash perceptual com indexação multi-partição/LSH, guarda de proporção), adaptada ao contrato de `acervo/esquema.sql`.
 
-A implementação de referência são as oito iterações do protótipo de origem, mantido fora deste repositório. A reescrita parte do que ficou de pé, não da cópia.
+Duas diferenças deliberadas em relação ao protótipo, exigidas pelo contrato da suite:
+
+- A passada perceptual **lê** `phash`/`largura`/`altura` de `arquivos` em vez de reabrir a imagem — é o próprio propósito de `sinais(fonte=exif)` no esquema: dar a este programa o que ele precisa sem redecodificar.
+- A política de representante é mais específica que a descrita acima: grupo exato usa a data de criação mais antiga; grupo perceptual usa qualidade mensurável (RAW > resolução > original-vs-edição via EXIF Software > menor perda de compressão via soma de quantização JPEG), com desempate por data. Ver `src/acervo_dedup/quality.py`.
+
+Comandos: `acervo-dedup scan` (detecta e grava relatório + `duplicatas`, nunca move nada) e `acervo-dedup isolar` (move para quarentena, dry-run por padrão, `--execute` para mover de fato). `python -m unittest discover -s tests` cobre a política de representante, os dois agrupamentos e um teste de ponta a ponta com disco e SQLite reais.
 
 ## Licença e monetização
 

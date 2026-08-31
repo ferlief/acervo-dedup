@@ -1,0 +1,114 @@
+# ==========================================================================
+#  acervo-dedup - arquivo de configuracao
+# ==========================================================================
+#
+#  Copie para 'config.yaml' e ajuste. Como no resto da suite acervo: as
+#  MEDIDAS (sha256, phash, distancia de Hamming) sao universais e ficam no
+#  codigo; o que entra aqui e' POLITICA - decisao sobre o que fazer com
+#  a medida.
+#
+#  NADA E' APAGADO. O motor isola (move para quarentena); apagar e' sempre
+#  decisao explicita de quem e' dono do acervo, feita fora deste programa.
+# ==========================================================================
+
+banco:
+  # SQLite do 'acervo' - o contrato entre os tres produtos da suite.
+  # acervo-dedup LE a tabela 'arquivos' (populada por 'acervo') e ESCREVE
+  # em 'duplicatas'. Nunca toca em 'sinais' nem em 'veredito'.
+  caminho: "./acervo.sqlite3"
+
+varredura:
+  # Diretorios fisicos a varrer em busca de arquivos redundantes. A tabela
+  # 'arquivos' guarda so' o ULTIMO caminho conhecido por conteudo (a chave
+  # e' sha256, nunca o caminho) - copias fisicas duplicadas em disco so'
+  # aparecem varrendo o disco de novo, por isso a varredura e' independente
+  # do que 'acervo' ja indexou.
+  raizes:
+    - "C:/CLAUDE/_RESCUE_LOTE1"
+
+  extensoes:
+    imagem: [".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tif", ".tiff", ".webp"]
+    raw: [".nef", ".cr2", ".cr3", ".arw", ".dng", ".orf", ".rw2", ".raf"]
+
+  # Cache privado de sha256 por (caminho, tamanho, mtime) - evita rehash em
+  # execucoes futuras. Fica FORA do banco compartilhado 'acervo'; e' estado
+  # interno do acervo-dedup, nao parte do contrato da suite.
+  cache: "./dedup_scan_cache.sqlite3"
+
+  threads: 8
+
+passada_exata:
+  # Tamanho do bloco de leitura para SHA-256 (bytes). 1 MiB e' o padrao
+  # herdado do prototipo - bom equilibrio para HD mecanico e SSD.
+  bloco_hash: 1048576
+
+passada_perceptual:
+  # Distancia de Hamming maxima (hash perceptual de 64 bits) para duas
+  # imagens serem consideradas "a mesma foto". Herdado dos protótipos
+  # dedup_fase2..7, calibrado contra o disco real do lote 1.
+  distancia_maxima: 5
+
+  # Proporcao (largura/altura) so' pode diferir por ate esta fracao. Sem
+  # isto, uma foto quadrada casa com uma capa panoramica - falso positivo
+  # confirmado no historico do prototipo (foto da lua vs. icone de app).
+  razao_aspecto_maxima: 1.10
+
+  # Guarda de imagem chapada (cor solida): o hash perceptual degenera e
+  # casa com QUALQUER outra chapada. O prototipo mediu isso reabrindo a
+  # imagem (desvio padrao do 32x32 em cinza, limiar 2.0). acervo-dedup NAO
+  # reabre arquivo de imagem por design (o esquema existe para nao repetir
+  # a decodificacao que 'acervo' ja fez) - por isso esta guarda fica
+  # DESLIGADA por padrao. Se 'sinais' ganhar uma medida de 'detalhe' no
+  # futuro, ligue aqui.
+  guarda_chapada_ativa: false
+
+qualidade:
+  # Criterio de desempate para o representante de um GRUPO PERCEPTUAL
+  # (visualmente iguais, bytes diferentes). Nesta ordem:
+  #   1) RAW sempre vence (extensao do arquivo)
+  #   2) maior resolucao efetiva (largura x altura, de 'arquivos')
+  #   3) original vence edicao, em empate de resolucao (ver 'editores'
+  #      abaixo) - a mesma correcao feita no protótipo irmao 'curadoria':
+  #      sem isto, versoes editadas por app foram promovidas por cima do
+  #      original mesmo quando so' MAIORES em bytes, nao melhores.
+  #   4) menor soma da tabela de quantizacao JPEG ('sinais' fonte=exif
+  #      chave=quant) - menor soma = menos perda de compressao. Ausente
+  #      (PNG, RAW, etc.) conta como neutro, nunca como pior.
+  #   5) em empate final: mtime mais antigo.
+  original_vence_edicao: true
+
+  # VIES DECLARADO: lista incompleta e enviesada por regiao/epoca. Ajuste
+  # para o seu acervo. Comparacao e' por substring, case-insensitive, na
+  # tag EXIF Software ('sinais' fonte=exif chave=software).
+  editores:
+    - vsco
+    - picasa
+    - photoshop
+    - adobe
+    - lightroom
+    - snapseed
+    - instagram
+    - picsart
+    - facetune
+    - prisma
+    - canva
+    - gimp
+    - pixlr
+    - befunky
+    - meitu
+    - b612
+    - retrica
+    - polarr
+    - photoscape
+    - afterlight
+    - darkroom
+    - windows photo
+    - paint
+
+quarentena:
+  # Onde 'acervo-dedup isolar' move os arquivos propostos para isolamento.
+  # A subpasta relativa a raiz de origem e' preservada.
+  diretorio: "./_quarentena_dedup"
+
+relatorio:
+  saida: "./dedup_report.json"

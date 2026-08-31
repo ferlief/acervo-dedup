@@ -51,3 +51,12 @@ config.yaml
 *.csv
 *.tsv
 *.parquet
+
+# --- artefatos de build/execucao do pacote Python -----------------
+*.egg-info/
+build/
+dist/
+__pycache__/
+dedup_report.json
+dedup_scan_cache.sqlite3
+_quarentena_dedup/
