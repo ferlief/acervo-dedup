@@ -1,4 +1,4 @@
-# dedup-engine
+# acervo-dedup
 
 Detecção de redundância em acervos grandes. CLI, sem interface.
 
