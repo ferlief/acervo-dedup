@@ -19,7 +19,7 @@ Apagar o original é irreversível. Por isso:
 
 ## Saída
 
-Grava na tabela `duplicatas` do `acervo-index`. Também exporta relatório JSON com `duplicate_groups`, espaço recuperável e o representante de cada grupo.
+Grava na tabela `duplicatas` do `acervo`. Também exporta relatório JSON com `duplicate_groups`, espaço recuperável e o representante de cada grupo.
 
 ## Estado
 
