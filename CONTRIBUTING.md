@@ -1,15 +1,19 @@
 # Contribuindo com acervo-dedup
 
-## Idioma dos commits
+## Mensagens de commit
 
-**Português.** Repositório fechado, sob Obsn Studios, sem audiência externa prevista — identificador, README, comentário de código: tudo já está em português. Um commit em inglês seria a única peça fora do padrão, não o contrário.
+**Inglês, sempre — [Conventional Commits](https://www.conventionalcommits.org/), modo imperativo.** Não depende de o repositório ser fechado ou ter audiência externa — é o padrão de quem programa de forma séria hoje, independentemente de quem lê depois. Identificador e comentário de código continuam em português; a mensagem de commit é uma superfície separada.
 
-Se este repositório algum dia abrir código ou ganhar colaborador que não leia português, esta é a primeira regra a revisar — não antes disso.
+```
+<type>(<scope>): short imperative summary, ≤50 chars
 
-## Formato
+Body explaining WHY this change exists, not what changed — the diff
+already shows what. Wrap at ~72 columns.
+```
 
-- Modo imperativo, foco no porquê da mudança, não só no quê.
-- Sem linha de atribuição a ferramenta de geração de código.
+Tipos comuns: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `build`, `ci`.
+
+Referências: [conventionalcommits.org](https://www.conventionalcommits.org/) para o formato, as 7 regras de Chris Beams ("How to Write a Git Commit Message") para a prosa. Sem linha de atribuição a ferramenta de geração de código.
 
 ## Antes de abrir um PR
 
