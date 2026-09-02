@@ -35,6 +35,7 @@ _DEFAULTS: dict[str, Any] = {
         "editores": [],
     },
     "quarentena": {"diretorio": "./_quarentena_dedup"},
+    "revisao": {"diretorio": "./_revisao_dedup"},
     "relatorio": {"saida": "./dedup_report.json"},
 }
 
@@ -64,6 +65,7 @@ class Config:
     original_vence_edicao: bool
     editores: tuple[str, ...]
     quarentena_dir: Path
+    revisao_dir: Path
     relatorio_saida: Path
 
     @property
@@ -103,5 +105,6 @@ def load_config(path: str | Path | None) -> Config:
         original_vence_edicao=bool(merged["qualidade"]["original_vence_edicao"]),
         editores=tuple(s.lower() for s in merged["qualidade"]["editores"]),
         quarentena_dir=Path(merged["quarentena"]["diretorio"]),
+        revisao_dir=Path(merged["revisao"]["diretorio"]),
         relatorio_saida=Path(merged["relatorio"]["saida"]),
     )

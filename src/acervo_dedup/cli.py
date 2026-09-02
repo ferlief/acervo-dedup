@@ -85,7 +85,8 @@ def _cmd_scan(args: argparse.Namespace) -> int:
                   "nao e' implementada nesta versao (ver config.example.yaml).")
         duplicados_perceptuais = sum(len(g.candidatos_quarentena) for g in grupos_perceptuais)
         print(f"  {stats.grupos_formados:,} grupo(s) perceptual(is), "
-              f"{duplicados_perceptuais:,} arquivo(s) candidato(s) a quarentena.\n")
+              f"{duplicados_perceptuais:,} arquivo(s) candidato(s) a REVISAO "
+              f"(semelhanca erra: nunca vao para quarentena).\n")
 
         todos_grupos = grupos_exatos + grupos_perceptuais
         linhas_duplicatas = db.linhas_para_duplicatas(todos_grupos)
@@ -102,17 +103,21 @@ def _cmd_scan(args: argparse.Namespace) -> int:
     print(f"\n{'=' * 70}")
     print(f"[Resultado] {resumo['grupos_exatos']:,} grupo(s) exato(s), "
           f"{resumo['grupos_perceptuais']:,} grupo(s) perceptual(is)")
-    print(f"[Resultado] {resumo['arquivos_propostos_para_quarentena']:,} arquivo(s) "
-          f"propostos para quarentena")
-    print(f"[Resultado] Espaco recuperavel: "
+    print(f"[quarentena] {resumo['arquivos_para_quarentena']:,} arquivo(s), "
+          f"{resumo['bytes_quarentena'] / 1024**3:.2f} GB "
+          f"- copia byte-identica, descarte seguro")
+    print(f"[revisao]    {resumo['arquivos_para_revisao']:,} arquivo(s), "
+          f"{resumo['bytes_revisao'] / 1024**3:.2f} GB "
+          f"- parecida, pode ser foto unica: voce decide")
+    print(f"[Resultado] Espaco recuperavel total: "
           f"{resumo['bytes_recuperaveis_total'] / 1024**3:.2f} GB")
     if resultado.erros:
         print(f"[AVISO] {len(resultado.erros):,} arquivo(s) com erro de leitura "
               f"(bloqueado/permissao) - nao entraram na comparacao.")
     print(f"{'=' * 70}")
     print(f"[Relatorio] {destino_relatorio.resolve()}")
-    print("\n>>> Nada foi movido. Rode 'acervo-dedup isolar' para mover os "
-          "candidatos para quarentena. <<<")
+    print("\n>>> Nada foi movido. 'acervo-dedup isolar --somente quarentena' move so' "
+          "o descarte seguro. <<<")
     return 0
 
 
@@ -127,15 +132,25 @@ def _cmd_isolar(args: argparse.Namespace) -> int:
         relatorio = json.load(f)
 
     quarentena_dir = Path(args.quarentena) if args.quarentena else cfg.quarentena_dir
+    revisao_dir = Path(args.revisao) if args.revisao else cfg.revisao_dir
+    destinos = {"quarentena": quarentena_dir, "revisao": revisao_dir}
+
     print(f"Relatorio:  {relatorio_path}")
-    print(f"Quarentena: {quarentena_dir}")
+    if args.somente in (None, "quarentena"):
+        print(f"Quarentena: {quarentena_dir}   (copia byte-identica: descarte seguro)")
+    if args.somente in (None, "revisao"):
+        print(f"Revisao:    {revisao_dir}   (parecida, pode ser foto unica: voce decide)")
+    if args.somente:
+        print(f"Filtro:     somente '{args.somente}'")
     print(f"Modo:       {'EXECUTE (vai mover)' if args.execute else 'DRY-RUN (so relatorio)'}\n")
 
-    resultado = executar_isolamento(relatorio, quarentena_dir, args.execute)
+    resultado = executar_isolamento(relatorio, destinos, args.execute, args.somente)
 
     verbo = "movido" if args.execute else "seria movido"
-    for origem, destino in resultado.movidos:
-        print(f"  {verbo}: {origem}  ->  {destino}")
+    for origem, destino, classe in resultado.movidos[:40]:
+        print(f"  {verbo} [{classe}]: {origem}  ->  {destino}")
+    if len(resultado.movidos) > 40:
+        print(f"  ... e mais {len(resultado.movidos) - 40:,} arquivo(s).")
     if resultado.ja_ausentes:
         print(f"\n[Info] {len(resultado.ja_ausentes):,} arquivo(s) do relatorio ja nao "
               f"existem no caminho original (provavelmente ja isolados antes).")
@@ -145,12 +160,20 @@ def _cmd_isolar(args: argparse.Namespace) -> int:
             print(f"    {origem}: {msg}")
 
     print(f"\n{'=' * 70}")
-    print(f"[Resultado] {len(resultado.movidos):,} arquivo(s) "
+    for classe in ("quarentena", "revisao"):
+        n = resultado.contagem_por_classe.get(classe, 0)
+        b = resultado.bytes_por_classe.get(classe, 0)
+        if n or args.somente in (None, classe):
+            print(f"[{classe:>10}] {n:,} arquivo(s), {b / 1024**3:.2f} GB")
+    print(f"[{'TOTAL':>10}] {len(resultado.movidos):,} arquivo(s) "
           f"{'movido(s)' if args.execute else 'a mover'}, "
           f"{resultado.bytes_movidos / 1024**3:.2f} GB")
     print(f"{'=' * 70}")
     if not args.execute:
         print("\n>>> DRY-RUN: nada foi movido. Rode com --execute para isolar de fato. <<<")
+    elif resultado.contagem_por_classe.get("revisao"):
+        print("\n>>> A pasta de revisao NAO e' descarte. Sao candidatos que podem ser "
+              "foto unica; nada ali sai sem voce olhar. <<<")
     return 0
 
 
@@ -167,9 +190,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_scan.add_argument("--relatorio", default=None, help="Caminho de saida do relatorio JSON.")
     p_scan.set_defaults(func=_cmd_scan)
 
-    p_isolar = sub.add_parser("isolar", help="Move para quarentena os candidatos do relatorio.")
+    p_isolar = sub.add_parser(
+        "isolar",
+        help="Move os candidatos do relatorio: copia identica -> quarentena, "
+             "parecida -> revisao.",
+    )
     p_isolar.add_argument("--relatorio", default=None, help="Relatorio JSON de entrada.")
-    p_isolar.add_argument("--quarentena", default=None, help="Diretorio de quarentena.")
+    p_isolar.add_argument("--quarentena", default=None,
+                          help="Diretorio de quarentena (copias byte-identicas).")
+    p_isolar.add_argument("--revisao", default=None,
+                          help="Diretorio de revisao (parecidas: decisao humana).")
+    p_isolar.add_argument("--somente", choices=["quarentena", "revisao"], default=None,
+                          help="Move so' uma das duas classes. Ex: --somente quarentena "
+                               "esvazia o descarte seguro sem tocar na fila de revisao.")
     p_isolar.add_argument("--execute", action="store_true", help="Move de fato. Sem a flag, dry-run.")
     p_isolar.set_defaults(func=_cmd_isolar)
 

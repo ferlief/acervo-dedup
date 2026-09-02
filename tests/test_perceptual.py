@@ -25,6 +25,7 @@ def make_cfg(distancia_maxima=5, razao_aspecto_maxima=1.10):
         original_vence_edicao=True,
         editores=(),
         quarentena_dir=Path("q"),
+        revisao_dir=Path("rev"),
         relatorio_saida=Path("r.json"),
     )
 

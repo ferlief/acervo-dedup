@@ -17,6 +17,19 @@ Apagar o original é irreversível. Por isso:
 - O representante do grupo é o de metadado de criação mais antigo, e a escolha é registrada com o motivo.
 - Exceção de arquivo bloqueado ou permissão negada não derruba a varredura global.
 
+## Dois destinos, por grau de certeza
+
+O que a passada exata acha e o que a perceptual acha não têm o mesmo grau de confiança, e por isso não vão para o mesmo lugar:
+
+| origem | destino | por quê |
+|---|---|---|
+| grupo **exato** | `quarentena` | Os bytes são idênticos. Ou o SHA-256 bate ou não bate — não há falso positivo possível. |
+| grupo **perceptual** | `revisao` | Veio de semelhança, que erra. Pode ser foto única. Fila de decisão humana, nunca descarte automático. |
+
+A separação é estrutural de propósito. Numa medição real numa pasta de referência facial, **4 de 11 candidatos perceptuais eram uma rajada** de fotos distintas — mesma pose, instantes e enquadramentos diferentes — e não cópias. Apertar o limiar de distância não resolveria: a rajada media distância 2, dentro de qualquer corte defensável. Limiar escolhido para fazer um caso específico passar é chute; separar por grau de certeza é garantia.
+
+`isolar --somente quarentena` move só o descarte seguro, sem tocar na fila de revisão.
+
 ## Saída
 
 Grava na tabela `duplicatas` do `acervo`. Também exporta relatório JSON com `duplicate_groups`, espaço recuperável e o representante de cada grupo.
@@ -30,7 +43,7 @@ Duas diferenças deliberadas em relação ao protótipo, exigidas pelo contrato 
 - A passada perceptual **lê** `phash`/`largura`/`altura` de `arquivos` em vez de reabrir a imagem — é o próprio propósito de `sinais(fonte=exif)` no esquema: dar a este programa o que ele precisa sem redecodificar.
 - A política de representante é mais específica que a descrita acima: grupo exato usa a data de criação mais antiga; grupo perceptual usa qualidade mensurável (RAW > resolução > original-vs-edição via EXIF Software > menor perda de compressão via soma de quantização JPEG), com desempate por data. Ver `src/acervo_dedup/quality.py`.
 
-Comandos: `acervo-dedup scan` (detecta e grava relatório + `duplicatas`, nunca move nada) e `acervo-dedup isolar` (move para quarentena, dry-run por padrão, `--execute` para mover de fato). `python -m unittest discover -s tests` cobre a política de representante, os dois agrupamentos e um teste de ponta a ponta com disco e SQLite reais.
+Comandos: `acervo-dedup scan` (detecta e grava relatório + `duplicatas`, nunca move nada) e `acervo-dedup isolar` (move para `quarentena`/`revisao` conforme o grau de certeza, dry-run por padrão, `--execute` para mover de fato, `--somente` para tratar uma classe por vez). `python -m unittest discover -s tests` cobre a política de representante, os dois agrupamentos, o roteamento entre os dois destinos e um teste de ponta a ponta com disco e SQLite reais.
 
 ## Licença e monetização
 

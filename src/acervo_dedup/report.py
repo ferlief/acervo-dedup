@@ -6,6 +6,26 @@ E' o artefato de GRAO DE ARQUIVO FISICO (tem caminho). A tabela
 decisao para consumo pelos outros produtos da suite (acervo-sort). O
 comando 'isolar' le ESTE relatorio, porque so' ele sabe quais caminhos
 fisicos mover; ver CLAUDE.md para o porque dessa divisao.
+
+DOIS DESTINOS, decididos aqui e gravados no relatorio (o 'isolar' so'
+obedece; nao reclassifica nada):
+
+  exato      -> 'quarentena'  Os bytes sao literalmente identicos. Nao ha'
+                              juizo possivel, nao ha' falso positivo
+                              possivel: ou o SHA-256 bate ou nao bate.
+  perceptual -> 'revisao'     A decisao veio de SEMELHANCA, que erra. Numa
+                              medicao real em _PESSOAS_MANTER, 4 de 11
+                              candidatos perceptuais eram uma RAJADA de
+                              fotos distintas (mesma pose, instantes e
+                              enquadramentos diferentes), nao copias - e
+                              isolar rajada numa pasta de referencia facial
+                              destroi exatamente a variacao de angulo que
+                              da' valor a pasta.
+
+A separacao e' ESTRUTURAL de proposito. A alternativa seria apertar o
+limiar de distancia ate' a rajada sair, mas a rajada media distancia 2 -
+dentro de qualquer corte defensavel. Limiar escolhido para fazer um caso
+especifico passar e' chute; separar por grau de certeza e' garantia.
 """
 
 from __future__ import annotations
@@ -16,6 +36,15 @@ from pathlib import Path
 
 from .models import GrupoDuplicata
 
+QUARENTENA = "quarentena"
+REVISAO = "revisao"
+
+
+def destino_de(metodo: str) -> str:
+    """Grau de certeza -> destino. Unica fonte da verdade dessa regra; o
+    resultado vai gravado no relatorio, e 'isolar' so' obedece."""
+    return QUARENTENA if metodo == "exato" else REVISAO
+
 
 def construir_relatorio(
     grupos: list[GrupoDuplicata],
@@ -24,15 +53,23 @@ def construir_relatorio(
 ) -> dict:
     duplicate_groups = []
     bytes_recuperaveis_total = 0
+    bytes_por_destino = {QUARENTENA: 0, REVISAO: 0}
+    arquivos_por_destino = {QUARENTENA: 0, REVISAO: 0}
+
     for g in grupos:
         rep = g.representante
         candidatos = g.candidatos_quarentena
         bytes_grupo = g.bytes_recuperaveis
         bytes_recuperaveis_total += bytes_grupo
+        destino = destino_de(g.metodo)
+        bytes_por_destino[destino] += bytes_grupo
+        arquivos_por_destino[destino] += len(candidatos)
+
         duplicate_groups.append(
             {
                 "grupo_id": g.grupo_id,
                 "metodo": g.metodo,
+                "destino": destino,
                 "representante": {
                     "sha256": rep.sha256,
                     "caminho": rep.caminho,
@@ -40,7 +77,7 @@ def construir_relatorio(
                     "mtime": rep.mtime,
                     "motivo": rep.motivo,
                 },
-                "candidatos_quarentena": [
+                "candidatos_isolamento": [
                     {
                         "sha256": m.sha256,
                         "caminho": m.caminho,
@@ -48,6 +85,7 @@ def construir_relatorio(
                         "mtime": m.mtime,
                         "distancia": m.distancia,
                         "motivo": m.motivo,
+                        "destino": destino,
                     }
                     for m in candidatos
                 ],
@@ -66,8 +104,12 @@ def construir_relatorio(
         "resumo": {
             "grupos_exatos": grupos_exatos,
             "grupos_perceptuais": grupos_perceptuais,
-            "arquivos_propostos_para_quarentena": arquivos_propostos,
+            "arquivos_propostos_isolamento": arquivos_propostos,
+            "arquivos_para_quarentena": arquivos_por_destino[QUARENTENA],
+            "arquivos_para_revisao": arquivos_por_destino[REVISAO],
             "bytes_recuperaveis_total": bytes_recuperaveis_total,
+            "bytes_quarentena": bytes_por_destino[QUARENTENA],
+            "bytes_revisao": bytes_por_destino[REVISAO],
         },
         "erros": [{"caminho": c, "mensagem": m} for c, m in erros],
     }

@@ -95,6 +95,7 @@ class TestIntegracao(unittest.TestCase):
         relatorio_path = self.base / "dedup_report.json"
         cache_path = self.base / "cache.sqlite3"
         quarentena = self.base / "_quarentena"
+        revisao = self.base / "_revisao"
         config_path.write_text(
             f"""
 banco:
@@ -106,6 +107,8 @@ varredura:
   threads: 2
 quarentena:
   diretorio: "{quarentena.as_posix()}"
+revisao:
+  diretorio: "{revisao.as_posix()}"
 relatorio:
   saida: "{relatorio_path.as_posix()}"
 """,
@@ -138,17 +141,25 @@ relatorio:
         self.assertEqual(relatorio["resumo"]["grupos_perceptuais"], 1)
         # 1 candidato no grupo exato (a.jpg) + 1 no perceptual (o representante
         # do exato, isto e' b.jpg, perde para d.jpg) = 2
-        self.assertEqual(relatorio["resumo"]["arquivos_propostos_para_quarentena"], 2)
+        self.assertEqual(relatorio["resumo"]["arquivos_propostos_isolamento"], 2)
 
-        caminhos_propostos = {
-            c["caminho"]
+        destino_por_caminho = {
+            c["caminho"]: c["destino"]
             for g in relatorio["duplicate_groups"]
-            for c in g["candidatos_quarentena"]
+            for c in g["candidatos_isolamento"]
         }
-        self.assertIn(str(self.raiz / "a.jpg"), caminhos_propostos)
-        self.assertIn(str(self.raiz / "b.jpg"), caminhos_propostos)
-        self.assertNotIn(str(self.raiz / "c.jpg"), caminhos_propostos)
-        self.assertNotIn(str(self.raiz / "d.jpg"), caminhos_propostos)
+        self.assertIn(str(self.raiz / "a.jpg"), destino_por_caminho)
+        self.assertIn(str(self.raiz / "b.jpg"), destino_por_caminho)
+        self.assertNotIn(str(self.raiz / "c.jpg"), destino_por_caminho)
+        self.assertNotIn(str(self.raiz / "d.jpg"), destino_por_caminho)
+
+        # ROTEAMENTO POR GRAU DE CERTEZA: a.jpg e' copia byte-identica de
+        # b.jpg -> descarte seguro. b.jpg so' perdeu por SEMELHANCA para
+        # d.jpg -> pode ser foto unica, vai para revisao humana.
+        self.assertEqual(destino_por_caminho[str(self.raiz / "a.jpg")], "quarentena")
+        self.assertEqual(destino_por_caminho[str(self.raiz / "b.jpg")], "revisao")
+        self.assertEqual(relatorio["resumo"]["arquivos_para_quarentena"], 1)
+        self.assertEqual(relatorio["resumo"]["arquivos_para_revisao"], 1)
 
         # --- isolar em dry-run: nada se move ---
         rc = cli_main(["--config", str(config_path), "isolar"])
@@ -156,16 +167,29 @@ relatorio:
         self.assertTrue((self.raiz / "a.jpg").exists())
         self.assertTrue((self.raiz / "b.jpg").exists())
         self.assertFalse(quarentena.exists())
+        self.assertFalse(revisao.exists())
 
-        # --- isolar --execute: move de fato, nunca apaga ---
-        rc = cli_main(["--config", str(config_path), "isolar", "--execute"])
+        # --- --somente quarentena: esvazia o descarte seguro e NAO encosta
+        # na fila de revisao. E' o modo que permite recuperar espaco sem
+        # arriscar foto unica. ---
+        rc = cli_main(
+            ["--config", str(config_path), "isolar", "--somente", "quarentena", "--execute"]
+        )
         self.assertEqual(rc, 0)
         self.assertFalse((self.raiz / "a.jpg").exists())
+        self.assertTrue((quarentena / "a.jpg").exists())
+        self.assertTrue((self.raiz / "b.jpg").exists())  # perceptual: intocado
+        self.assertFalse(revisao.exists())
+
+        # --- isolar --execute (sem filtro): agora o perceptual vai, mas para
+        # a pasta de REVISAO, nunca para quarentena ---
+        rc = cli_main(["--config", str(config_path), "isolar", "--execute"])
+        self.assertEqual(rc, 0)
         self.assertFalse((self.raiz / "b.jpg").exists())
+        self.assertTrue((revisao / "b.jpg").exists())
+        self.assertFalse((quarentena / "b.jpg").exists())
         self.assertTrue((self.raiz / "c.jpg").exists())  # unico, nunca tocado
         self.assertTrue((self.raiz / "d.jpg").exists())  # representante perceptual, fica
-        self.assertTrue((quarentena / "a.jpg").exists())
-        self.assertTrue((quarentena / "b.jpg").exists())
 
     def test_arquivo_bloqueado_nao_derruba_a_varredura(self):
         """Invariante 4: falha de I/O vira erro registrado, nao excecao

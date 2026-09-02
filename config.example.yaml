@@ -106,9 +106,26 @@ qualidade:
     - paint
 
 quarentena:
-  # Onde 'acervo-dedup isolar' move os arquivos propostos para isolamento.
+  # DESTINO 1 de 2. Copias BYTE-IDENTICAS (grupo exato). Os bytes sao
+  # literalmente os mesmos: nao existe falso positivo possivel aqui, ou o
+  # SHA-256 bate ou nao bate. Descarte seguro.
   # A subpasta relativa a raiz de origem e' preservada.
   diretorio: "./_quarentena_dedup"
+
+revisao:
+  # DESTINO 2 de 2. Arquivos PARECIDOS, nao identicos (grupo perceptual).
+  # Semelhanca erra: numa medicao real em pasta de referencia facial, 4 de
+  # 11 candidatos perceptuais eram uma RAJADA de fotos distintas (mesma
+  # pose, instantes e enquadramentos diferentes) e nao copias. Isolar
+  # rajada como se fosse duplicata destroi a variacao de angulo que da'
+  # valor aquela pasta.
+  #
+  # Por isso o perceptual NUNCA vai para quarentena: vai para ca', que e'
+  # fila de decisao humana. A separacao e' estrutural de proposito -
+  # apertar o limiar de distancia nao resolveria (a rajada media distancia
+  # 2, dentro de qualquer corte defensavel), e limiar escolhido para fazer
+  # um caso passar e' chute.
+  diretorio: "./_revisao_dedup"
 
 relatorio:
   saida: "./dedup_report.json"

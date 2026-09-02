@@ -24,6 +24,7 @@ def make_cfg(editores=("vsco", "photoshop"), original_vence_edicao=True):
         original_vence_edicao=original_vence_edicao,
         editores=editores,
         quarentena_dir=Path("q"),
+        revisao_dir=Path("rev"),
         relatorio_saida=Path("r.json"),
     )
 
