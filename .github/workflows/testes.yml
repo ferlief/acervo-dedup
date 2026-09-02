@@ -1,0 +1,46 @@
+name: testes
+
+# Existe para que um commit quebrado nao chegue a main sem ninguem notar.
+# A suite local passa; o que faltava era alguem rodar ela sem ser pedido.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Instalar o pacote e suas dependencias declaradas
+        # Sem --no-deps de proposito: acervo-dedup afirma no README que nao
+        # depende de Pillow (le phash do banco em vez de reabrir a imagem).
+        # Instalar so o que o pyproject declara e o que prova essa afirmacao.
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install pytest
+
+      - name: Rodar a suite
+        run: python -m pytest -q
+
+      - name: Nenhum modulo pode importar Pillow ou ImageHash
+        # Invariante do README: a imagem e decodificada uma vez so pela suite,
+        # dentro de 'acervo'. Se um import desses aparecer aqui, a divisao de
+        # trabalho entre os dois programas foi quebrada.
+        run: |
+          if grep -rniE '^[[:space:]]*(import|from)[[:space:]]+(PIL|imagehash)' src/; then
+            echo "::error::acervo-dedup passou a decodificar imagem; ver README, secao 'dois programas'."
+            exit 1
+          fi
