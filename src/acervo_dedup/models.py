@@ -1,4 +1,4 @@
-"""Tipos compartilhados entre a passada exata, a perceptual e o relatorio."""
+"""Types shared by the exact pass, the perceptual pass and the report."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ class MembroGrupo:
     tamanho: int
     mtime: float | None
     e_representante: bool
-    distancia: float | None  # None quando exato; Hamming ate' o representante quando perceptual
-    motivo: str  # por que ficou (representante) ou por que foi proposto para quarentena
+    distancia: float | None  # None when exact; Hamming to the representative when perceptual
+    motivo: str  # why it stayed (representative) or why it was proposed for quarantine
 
 
 @dataclasses.dataclass

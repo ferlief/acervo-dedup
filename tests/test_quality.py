@@ -76,32 +76,32 @@ class TestEscolherRepresentante(unittest.TestCase):
     def test_desempata_por_mtime_mais_antigo_quando_rank_empata(self):
         candidatos = [
             ("H1", (0, 1000, 1), None, 500.0),
-            ("H2", (0, 1000, 1), None, 100.0),  # mesmo rank, mais antigo
+            ("H2", (0, 1000, 1), None, 100.0),  # same rank, older
             ("H3", (0, 1000, 1), None, 900.0),
         ]
         self.assertEqual(escolher_representante(candidatos), "H2")
 
     def test_rank_key_decide_antes_de_mtime(self):
         candidatos = [
-            ("H1", (0, 1000, 1), None, 1.0),  # mais antigo, mas pior rank
-            ("H2", (1, 1000, 1), None, 999.0),  # RAW, mais novo, ganha mesmo assim
+            ("H1", (0, 1000, 1), None, 1.0),  # older, but worse rank
+            ("H2", (1, 1000, 1), None, 999.0),  # RAW, newer, wins anyway
         ]
         self.assertEqual(escolher_representante(candidatos), "H2")
 
     def test_quant_desempata_quando_todos_tem_o_dado(self):
         candidatos = [
-            ("H1", (0, 1000, 1), 640.0, 50.0),  # mais comprimido
-            ("H2", (0, 1000, 1), 80.0, 50.0),  # menos comprimido, ganha
+            ("H1", (0, 1000, 1), 640.0, 50.0),  # more compressed
+            ("H2", (0, 1000, 1), 80.0, 50.0),  # less compressed, wins
         ]
         self.assertEqual(escolher_representante(candidatos), "H2")
 
     def test_quant_e_ignorado_se_algum_empatado_nao_tem_o_dado(self):
-        """Sem isto, um PNG (sem quant) perderia ou ganharia de um JPEG so'
-        por causa da ausencia do sinal - nao e' uma comparacao justa, entao
-        o criterio inteiro e' pulado e cai direto no desempate por mtime."""
+        """Without this, a PNG (no quant) would win or lose against a JPEG
+        purely because the signal is missing - not a fair comparison, so the
+        whole criterion is skipped and the tie-break falls to mtime."""
         candidatos = [
-            ("H1", (0, 1000, 1), 10.0, 900.0),  # tem quant baixo, mas mais novo
-            ("H2", (0, 1000, 1), None, 100.0),  # sem quant, mas mais antigo
+            ("H1", (0, 1000, 1), 10.0, 900.0),  # low quant, but newer
+            ("H2", (0, 1000, 1), None, 100.0),  # no quant, but older
         ]
         self.assertEqual(escolher_representante(candidatos), "H2")
 

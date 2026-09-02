@@ -1,20 +1,19 @@
-"""Varredura de disco + SHA-256 em blocos.
+"""Disk walk + chunked SHA-256.
 
-Portado de acervo-prototipo/dedup_fase1.py e dedup_fase2.py: triagem por
-tamanho (arquivo de tamanho unico morre na peneira sem I/O), SHA-256 em
-blocos para os candidatos, cache privado em SQLite para nao reprocessar em
-execucoes futuras (mesma logica de reconciliacao "o disco e' a verdade, o
-indice e' so' cache" do fase2 v2/v3).
+Ported from acervo-prototipo/dedup_fase1.py and dedup_fase2.py: size
+triage (a file with a unique size dies in the sieve without any I/O),
+chunked SHA-256 for the candidates, and a private SQLite cache so future
+runs do not reprocess (the same "the disk is the truth, the index is only
+a cache" reconciliation logic as fase2 v2/v3).
 
-Por que uma varredura propria, independente de 'arquivos': a tabela
-'arquivos' e' chaveada por sha256 ("a chave e' sempre sha256, nunca o
-caminho" - acervo/esquema.sql), entao ela guarda so' o ULTIMO caminho
-conhecido por conteudo. Copias fisicas duplicadas em disco (o proprio
-objeto que este programa existe para achar) nao sobrevivem a essa
-indexacao - so' aparecem varrendo o disco de novo.
+Why a dedicated walk instead of reusing 'arquivos': that table is keyed by
+sha256 ("the key is always sha256, never the path" - acervo/esquema.sql),
+so it keeps only the LAST known path per content. Duplicated physical
+copies on disk - the very object this program exists to find - do not
+survive that indexing; they only show up by walking the disk again.
 
-Invariante 4 do acervo-dedup (CLAUDE.md): falha de I/O nao derruba a
-varredura. Arquivo bloqueado ou sem permissao vira registro de erro.
+acervo-dedup invariant 4 (CLAUDE.md): an I/O failure does not bring the
+scan down. A locked or unreadable file becomes an error record.
 """
 
 from __future__ import annotations
@@ -29,8 +28,8 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class ArquivoFisico:
-    """Um arquivo REAL no disco, identificado por caminho (nao por sha256 -
-    e' exatamente essa distincao que falta em 'arquivos')."""
+    """A REAL file on disk, identified by path (not by sha256 - that is
+    exactly the distinction 'arquivos' cannot express)."""
 
     caminho: str
     tamanho: int
@@ -41,7 +40,7 @@ class ArquivoFisico:
 @dataclass
 class ResultadoVarredura:
     arquivos: list[ArquivoFisico]
-    erros: list[tuple[str, str]]  # (caminho, mensagem)
+    erros: list[tuple[str, str]]  # (path, message)
 
 
 def _init_cache(conn: sqlite3.Connection) -> None:
@@ -63,8 +62,8 @@ def _init_cache(conn: sqlite3.Connection) -> None:
 def _listar_disco(
     raizes: list[Path], extensoes: frozenset[str], erros: list[tuple[str, str]]
 ) -> dict[str, tuple[int, float]]:
-    """{caminho: (tamanho, mtime)}. Um diretorio ou arquivo inacessivel vira
-    erro registrado, nunca excecao fatal (invariante 4)."""
+    """{path: (size, mtime)}. An unreachable directory or file becomes a
+    recorded error, never a fatal exception (invariant 4)."""
     disco: dict[str, tuple[int, float]] = {}
     for raiz in raizes:
         if not raiz.exists():
@@ -99,8 +98,8 @@ def _listar_disco(
 def _reconciliar(
     conn: sqlite3.Connection, disco: dict[str, tuple[int, float]]
 ) -> dict[str, tuple[int, float, str | None]]:
-    """O disco e' a verdade; o cache e' so' cache (mesma logica do
-    prototipo). Devolve {caminho: (tamanho, mtime, sha256_ou_None)}."""
+    """The disk is the truth; the cache is only a cache (same logic as the
+    prototype). Returns {path: (size, mtime, sha256_or_None)}."""
     cached = {
         r[0]: (r[1], r[2], r[3])
         for r in conn.execute("SELECT path, size_bytes, mtime, sha256 FROM files")
@@ -148,8 +147,8 @@ def _hash_pendentes(
     threads: int,
     erros: list[tuple[str, str]],
 ) -> dict[str, str]:
-    """SHA-256 em blocos, so' dos candidatos (tamanho ja colidiu com outro
-    arquivo - triagem por tamanho ja aconteceu antes de chamar isto)."""
+    """Chunked SHA-256, candidates only (their size already collided with
+    another file - size triage ran before this is called)."""
     if not pendentes:
         return {}
 
@@ -187,14 +186,14 @@ def varrer(
     bloco_hash: int,
     threads: int,
 ) -> ResultadoVarredura:
-    """Ponto de entrada: passada exata, etapa 1 (triagem + hash).
+    """Entry point: exact pass, stage 1 (triage + hash).
 
-    1) lista o disco;
-    2) reconcilia com o cache privado (o disco e' a verdade);
-    3) triagem por tamanho: so' arquivos cujo tamanho colide com o de
-       algum outro viram candidatos a hash (tamanho unico morre aqui, sem
-       I/O nenhum - e' o proprio ponto da peneira);
-    4) SHA-256 em blocos so' dos candidatos, com cache entre execucoes.
+    1) list the disk;
+    2) reconcile against the private cache (the disk is the truth);
+    3) size triage: only files whose size collides with another file's
+       become hash candidates (a unique size dies here, with no I/O at all
+       - that is the whole point of the sieve);
+    4) chunked SHA-256 for the candidates only, cached across runs.
     """
     erros: list[tuple[str, str]] = []
     disco = _listar_disco(raizes, extensoes, erros)
@@ -220,14 +219,14 @@ def varrer(
         arquivos: list[ArquivoFisico] = []
         for p, (tam, mt, sha) in estado.items():
             if tamanhos[tam] == 1:
-                # tamanho unico: nao precisa de hash para saber que nao tem
-                # duplicata exata - mas ainda participa da passada perceptual
+                # Unique size: no hash needed to know it has no exact
+                # duplicate - but it still joins the perceptual pass.
                 arquivos.append(ArquivoFisico(p, tam, mt, sha256=None))
             elif p in ja_com_hash_relevante:
                 arquivos.append(ArquivoFisico(p, tam, mt, sha256=sha))
             elif p in novos_hashes:
                 arquivos.append(ArquivoFisico(p, tam, mt, sha256=novos_hashes[p]))
-            # arquivos com erro de hash ficam de fora (ja registrados em erros)
+            # Files that failed to hash are left out (already recorded in erros).
     finally:
         conn.close()
 
@@ -241,15 +240,15 @@ def completar_hashes(
     threads: int,
     erros: list[tuple[str, str]],
 ) -> dict[str, str]:
-    """Calcula SHA-256 dos caminhos dados que ainda nao tem hash no cache.
+    """Computes SHA-256 for the given paths that have no hash in the cache.
 
-    Usado pela passada perceptual: para cruzar um sobrevivente da passada
-    exata com 'arquivos' (chaveada por sha256), o sha256 dele precisa
-    existir - mesmo que a passada exata tenha pulado o hash dele por ser de
-    tamanho unico (a otimizacao da passada exata e' nao comparar hash entre
-    arquivos que nunca poderiam ser identicos; nao e' "nunca hashear
-    ninguem"). So' os SOBREVIVENTES da passada exata chegam aqui, um
-    conjunto muito menor que o total varrido.
+    Used by the perceptual pass: to join an exact-pass survivor against
+    'arquivos' (keyed by sha256) its sha256 has to exist - even when the
+    exact pass skipped hashing it for having a unique size (the exact
+    pass's optimization is not comparing hashes between files that could
+    never be identical; it is not "never hash anyone"). Only the SURVIVORS
+    of the exact pass reach this point, a far smaller set than everything
+    scanned.
     """
     if not caminhos:
         return {}

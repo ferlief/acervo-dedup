@@ -1,29 +1,31 @@
-"""Passada 2: duplicatas perceptuais.
+"""Pass 2: perceptual duplicates.
 
-Pega hash perceptual (phash) e dimensoes de 'arquivos' - NAO reabre nenhum
-arquivo de imagem. O esquema documenta essa escolha explicitamente:
-"acervo ja decodifica a imagem uma vez para tirar phash/largura/altura...
-para dar a acervo-dedup o que ele precisa... sem abrir o arquivo de novo"
-(acervo/esquema.sql). Um sobrevivente sem phash em 'arquivos' (ainda nao
-indexado por 'acervo', ou nao e' imagem) fica de fora desta passada -
-comportamento documentado, nao erro.
+Reads the perceptual hash (phash) and the dimensions from 'arquivos' - it
+NEVER reopens an image file. The schema documents that choice explicitly:
+acervo already decodes the image once to extract phash/largura/altura in
+order to hand acervo-dedup what it needs without opening the file again
+(acervo/esquema.sql). A survivor with no phash in 'arquivos' (not indexed
+by 'acervo' yet, or not an image) sits this pass out - documented
+behaviour, not an error.
 
-Agrupamento por indexacao multi-particao (LSH), portado dos prototipos
-dedup_fase2/5/7: o hash de 64 bits vira 8 particoes de 1 byte; pelo
-principio da casa dos pombos, dois hashes a distancia <= 7 colidem em pelo
-menos uma particao. Evita comparar todos os pares (O(n^2)).
+Grouping uses multi-partition indexing (LSH), ported from the
+dedup_fase2/5/7 prototypes: the 64-bit hash is split into 8 one-byte
+partitions; by the pigeonhole principle two hashes at distance <= 7
+collide in at least one partition. That avoids the O(n^2) all-pairs
+comparison.
 
-GUARDA DE PROPORCAO (herdada do prototipo, confirmada em dados reais: uma
-foto da lua 1836x1836 casou com um icone de app 2480x1200): duas imagens
-so' podem ser "a mesma" se a proporcao (largura/altura) nao diferir mais
-que 'razao_aspecto_maxima'.
+ASPECT-RATIO GUARD (inherited from the prototype, confirmed on real data:
+a 1836x1836 photo of the moon matched a 2480x1200 app icon): two images can
+only be "the same" if their aspect ratio (width/height) does not differ by
+more than 'razao_aspecto_maxima'.
 
-GUARDA DE IMAGEM CHAPADA: o prototipo tambem calibrou uma guarda contra
-imagem de cor solida (hash perceptual degenera e casa com qualquer outra
-chapada), mas ela exigia reabrir a imagem para medir desvio padrao. Fica
-DESLIGADA aqui por padrao (config 'passada_perceptual.guarda_chapada_ativa')
-precisamente para preservar a garantia de nao reabrir arquivo - ver
-config.example.yaml para o raciocinio completo e o caminho de extensao.
+FLAT-IMAGE GUARD: the prototype also calibrated a guard against solid
+colour images (the perceptual hash degenerates and matches any other flat
+image), but it required reopening the image to measure standard deviation.
+It stays OFF here by default (config
+'passada_perceptual.guarda_chapada_ativa') precisely to preserve the
+never-reopen-a-file guarantee - see config.example.yaml for the full
+reasoning and the extension path.
 """
 
 from __future__ import annotations
@@ -55,7 +57,7 @@ def _hamming_hex(a: str, b: str) -> int:
 
 def _aspecto_compativel(a: ArquivoInfo, b: ArquivoInfo, razao_max: float) -> bool:
     if not (a.largura and a.altura and b.largura and b.altura):
-        return True  # sem dimensao conhecida, nao bloqueia
+        return True  # no known dimensions: do not block
     ra, rb = a.largura / a.altura, b.largura / b.altura
     maior, menor = (ra, rb) if ra >= rb else (rb, ra)
     if menor == 0:
@@ -80,10 +82,10 @@ class _UnionFind:
 
 
 def _grupo_id(sha256_list: list[str]) -> str:
-    """Deterministico e estavel entre execucoes: depende so' do CONJUNTO de
-    sha256 do grupo, nao de qual deles acabou sendo o representante (a
-    escolha de representante pode mudar entre execucoes se 'sinais' ganhar
-    dados novos - o id do grupo nao deveria)."""
+    """Deterministic and stable across runs: it depends only on the SET of
+    sha256 values in the group, not on which one ended up as the
+    representative (that choice can change between runs as 'sinais' gains
+    new data - the group id should not)."""
     chave = ",".join(sorted(sha256_list))
     return "perc-" + hashlib.sha1(chave.encode("utf-8")).hexdigest()[:16]
 

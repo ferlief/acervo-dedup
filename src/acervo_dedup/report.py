@@ -1,31 +1,33 @@
-"""Relatorio JSON: duplicate_groups, espaco recuperavel, representante e
-motivo de cada grupo (README, secao "Saida").
+"""JSON report: duplicate_groups, recoverable space, and the
+representative plus its reason for every group (README, "Saida" section).
 
-E' o artefato de GRAO DE ARQUIVO FISICO (tem caminho). A tabela
-'duplicatas' e' o artefato de GRAO DE CONTEUDO (sha256) - registra a
-decisao para consumo pelos outros produtos da suite (acervo-sort). O
-comando 'isolar' le ESTE relatorio, porque so' ele sabe quais caminhos
-fisicos mover; ver CLAUDE.md para o porque dessa divisao.
+This is the PHYSICAL-FILE-GRAIN artifact (it carries paths). The
+'duplicatas' table is the CONTENT-GRAIN artifact (sha256) - it records the
+decision for the other products in the suite to consume (acervo-sort). The
+'isolar' command reads THIS report, because only it knows which physical
+paths to move; see CLAUDE.md for why the split exists.
 
-DOIS DESTINOS, decididos aqui e gravados no relatorio (o 'isolar' so'
-obedece; nao reclassifica nada):
+TWO DESTINATIONS, decided here and written into the report ('isolar' only
+obeys; it never reclassifies anything):
 
-  exato      -> 'quarentena'  Os bytes sao literalmente identicos. Nao ha'
-                              juizo possivel, nao ha' falso positivo
-                              possivel: ou o SHA-256 bate ou nao bate.
-  perceptual -> 'revisao'     A decisao veio de SEMELHANCA, que erra. Numa
-                              medicao real em _PESSOAS_MANTER, 4 de 11
-                              candidatos perceptuais eram uma RAJADA de
-                              fotos distintas (mesma pose, instantes e
-                              enquadramentos diferentes), nao copias - e
-                              isolar rajada numa pasta de referencia facial
-                              destroi exatamente a variacao de angulo que
-                              da' valor a pasta.
+  exact      -> 'quarentena'  The bytes are literally identical. No
+                              judgement is possible and no false positive
+                              is possible: either the SHA-256 matches or it
+                              does not.
+  perceptual -> 'revisao'     The decision came from SIMILARITY, which gets
+                              things wrong. In a real measurement over a
+                              face-reference folder, 4 out of 11 perceptual
+                              candidates were a BURST of distinct photos
+                              (same pose, different instants and framings),
+                              not copies - and isolating a burst out of a
+                              face-reference folder destroys exactly the
+                              angle variation that makes the folder useful.
 
-A separacao e' ESTRUTURAL de proposito. A alternativa seria apertar o
-limiar de distancia ate' a rajada sair, mas a rajada media distancia 2 -
-dentro de qualquer corte defensavel. Limiar escolhido para fazer um caso
-especifico passar e' chute; separar por grau de certeza e' garantia.
+The separation is STRUCTURAL on purpose. The alternative would be
+tightening the distance threshold until the burst drops out, but the burst
+averaged distance 2 - inside any defensible cut. A threshold picked to make
+one specific case pass is a guess; splitting by degree of certainty is a
+guarantee.
 """
 
 from __future__ import annotations
@@ -41,8 +43,9 @@ REVISAO = "revisao"
 
 
 def destino_de(metodo: str) -> str:
-    """Grau de certeza -> destino. Unica fonte da verdade dessa regra; o
-    resultado vai gravado no relatorio, e 'isolar' so' obedece."""
+    """Degree of certainty -> destination. The single source of truth for
+    this rule; the result is written into the report and 'isolar' only
+    obeys it."""
     return QUARENTENA if metodo == "exato" else REVISAO
 
 

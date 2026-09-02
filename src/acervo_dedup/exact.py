@@ -1,14 +1,13 @@
-"""Passada 1: duplicatas exatas.
+"""Pass 1: exact duplicates.
 
-Politica de representante (mais especifica que o README - ver CLAUDE.md
-do usuario / instrucao da tarefa): dentro de um grupo BYTE-IDENTICO (mesmo
-SHA-256), o representante e' o de METADADO DE CRIACAO (mtime) MAIS ANTIGO;
-os demais sao propostos para quarentena. Ninguem e' apagado por este
-modulo - so' marcado.
+Representative policy (more specific than the README): inside a
+BYTE-IDENTICAL group (same SHA-256), the representative is the one with
+the OLDEST CREATION METADATA (mtime); the others are proposed for
+quarantine. Nothing is deleted by this module - only marked.
 
-Um grupo exato tem, por definicao, UM UNICO sha256 (e' a propria definicao
-de "byte-identico"). O grupo_id usado e' o proprio sha256: deterministico
-e idempotente entre execucoes.
+An exact group has, by definition, a SINGLE sha256 (that is precisely what
+"byte-identical" means). The grupo_id used is that same sha256:
+deterministic and idempotent across runs.
 """
 
 from __future__ import annotations
@@ -29,10 +28,9 @@ def agrupar_exatas(arquivos: list[ArquivoFisico]) -> list[GrupoDuplicata]:
     for sha256, membros_fisicos in por_hash.items():
         if len(membros_fisicos) < 2:
             continue
-        # representante: mtime mais antigo. Empate de mtime (raro, mas
-        # possivel em copias feitas na mesma operacao de backup): desempata
-        # por caminho, so' para ter uma escolha deterministica e estavel
-        # entre execucoes.
+        # Representative: oldest mtime. An mtime tie (rare, but possible
+        # for copies produced by the same backup operation) breaks by path,
+        # only so the choice stays deterministic and stable across runs.
         ordenados = sorted(membros_fisicos, key=lambda a: (a.mtime, a.caminho))
         representante_fisico = ordenados[0]
 

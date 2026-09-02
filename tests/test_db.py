@@ -10,11 +10,11 @@ from acervo_dedup.models import GrupoDuplicata, MembroGrupo
 
 class TestLinhasParaDuplicatas(unittest.TestCase):
     def test_grupo_exato_com_varias_copias_fisicas_gera_uma_unica_linha(self):
-        """Regressao: um grupo exato com 3 copias fisicas do mesmo sha256
-        nao pode gerar 3 linhas (sha256, grupo_id) - a PRIMARY KEY da
-        tabela 'duplicatas' e' exatamente esse par, e as 3 copias
-        compartilham o mesmo sha256 por definicao. Uma linha por membro
-        colidiria na segunda insercao."""
+        """Regression: an exact group with 3 physical copies of the same
+        sha256 must not produce 3 (sha256, grupo_id) rows - that pair is
+        exactly the PRIMARY KEY of the 'duplicatas' table, and the 3 copies
+        share the same sha256 by definition. One row per member would
+        collide on the second insert."""
         grupo = GrupoDuplicata(
             grupo_id="H1",
             metodo="exato",
@@ -26,7 +26,7 @@ class TestLinhasParaDuplicatas(unittest.TestCase):
         )
         linhas = linhas_para_duplicatas([grupo])
         self.assertEqual(linhas, [("H1", "H1", 1, "exato", None)])
-        # PK (sha256, grupo_id) nunca se repete
+        # The (sha256, grupo_id) PK never repeats.
         chaves = [(sha, gid) for sha, gid, _rep, _met, _dist in linhas]
         self.assertEqual(len(chaves), len(set(chaves)))
 

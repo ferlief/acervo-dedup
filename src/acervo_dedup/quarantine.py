@@ -1,18 +1,20 @@
-"""Comando 'isolar': move os arquivos propostos no relatorio JSON. Comando
-EXPLICITO e SEPARADO de 'scan' - README e CLAUDE.md sao categoricos: "o
-motor isola, nunca apaga" e a remocao (aqui, mover) e' sempre um passo
-separado, explicito. 'scan' nunca chama isto sozinho.
+"""The 'isolar' command: moves the files proposed in the JSON report. It is
+EXPLICIT and SEPARATE from 'scan' - README and CLAUDE.md are categorical:
+the engine isolates, it never deletes, and removal (here, moving) is always
+a separate, explicit step. 'scan' never calls this on its own.
 
-DOIS DESTINOS, ja decididos pelo relatorio (ver report.py). Este modulo
-NAO reclassifica: le o campo 'destino' de cada candidato e obedece.
+TWO DESTINATIONS, already decided by the report (see report.py). This
+module does NOT reclassify: it reads each candidate's 'destino' field and
+obeys.
 
-  quarentena  copia byte-identica. Descarte seguro.
-  revisao     parecida, nao identica. Pode ser foto unica - fila de decisao
-              humana, nunca descarte automatico.
+  quarentena  byte-identical copy. Safe discard.
+  revisao     similar, not identical. May be a unique photo - a human
+              decision queue, never an automatic discard.
 
-Nada e' sobrescrito: colisao de destino ganha sufixo _dup1, _dup2... Falha
-de I/O (arquivo bloqueado, sem permissao, ja movido por outra ferramenta)
-vira registro de erro, nunca excecao fatal (mesma garantia do scan).
+Nothing is overwritten: a destination collision gets a _dup1, _dup2...
+suffix. An I/O failure (locked file, no permission, already moved by
+another tool) becomes an error record, never a fatal exception (the same
+guarantee the scan gives).
 """
 
 from __future__ import annotations
@@ -59,10 +61,10 @@ def _destino_unico(base: Path, relativo: Path, reservados: set[str]) -> Path:
 
 
 def _candidatos_do_grupo(grupo: dict) -> list[dict]:
-    """'candidatos_isolamento' e' o nome atual; 'candidatos_quarentena' era o
-    nome quando havia um destino so'. Aceitar os dois evita que um relatorio
-    gerado antes desta mudanca falhe silenciosamente (devolvendo lista
-    vazia, isto e', "nada a mover")."""
+    """'candidatos_isolamento' is the current name; 'candidatos_quarentena'
+    was the name back when there was a single destination. Accepting both
+    keeps a report generated before that change from failing silently (by
+    returning an empty list, that is, "nothing to move")."""
     if "candidatos_isolamento" in grupo:
         return grupo["candidatos_isolamento"]
     return grupo.get("candidatos_quarentena", [])
@@ -76,15 +78,15 @@ def isolar(
 ) -> ResultadoIsolamento:
     """destinos: {'quarentena': Path, 'revisao': Path}.
 
-    somente: se dado, move so' essa classe. E' o que permite esvaziar a
-    quarentena (descarte seguro) sem tocar na fila de revisao."""
+    somente: when given, moves only that class. It is what allows emptying
+    the quarantine (safe discard) without touching the review queue."""
     raizes = [Path(r) for r in relatorio.get("raizes_varridas", [])]
     resultado = ResultadoIsolamento()
     reservados: set[str] = set()
 
     for grupo in relatorio.get("duplicate_groups", []):
-        # relatorio antigo (um destino so'): tudo que era candidato era
-        # quarentena, por definicao de quando foi gerado.
+        # Legacy report (single destination): everything that was a
+        # candidate was quarantine, by definition of when it was generated.
         destino_grupo = grupo.get("destino", QUARENTENA)
         for candidato in _candidatos_do_grupo(grupo):
             classe = candidato.get("destino", destino_grupo)

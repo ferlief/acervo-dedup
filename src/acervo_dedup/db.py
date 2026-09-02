@@ -1,13 +1,13 @@
-"""Acesso ao SQLite do 'acervo' - o contrato entre acervo, acervo-dedup e
-acervo-sort (ver acervo/esquema.sql).
+"""Access to the 'acervo' SQLite database - the contract between acervo,
+acervo-dedup and acervo-sort (see acervo/esquema.sql).
 
-Invariante 5 (CLAUDE.md do acervo-dedup): "Escreve em duplicatas, le
-arquivos." Este modulo escreve SOMENTE na tabela 'duplicatas'. As funcoes
-de leitura de 'sinais' existem porque o proprio esquema.sql documenta
-'sinais(fonte=exif)' como o canal pensado para dar a acervo-dedup o que
-ele precisa para escolher representante sem reabrir a imagem - "nao e'
-politica: e' o mesmo tipo de fato bruto que phash ja e'". Nada aqui grava
-em 'sinais' nem em 'veredito'.
+Invariant 5 (acervo-dedup CLAUDE.md): "writes to duplicatas, reads
+arquivos." This module writes ONLY to the 'duplicatas' table. The readers
+for 'sinais' exist because esquema.sql itself documents 'sinais
+(fonte=exif)' as the channel meant to hand acervo-dedup what it needs to
+pick a representative without reopening the image - it is not policy, it
+is the same kind of raw fact phash already is. Nothing here writes to
+'sinais' or to 'veredito'.
 """
 
 from __future__ import annotations
@@ -19,9 +19,9 @@ from pathlib import Path
 
 from .models import GrupoDuplicata
 
-# DDL exata de acervo/esquema.sql para a tabela que acervo-dedup possui.
-# Repetida aqui (nao importada) porque os tres produtos sao repositorios
-# separados; esquema.sql e' o contrato, esta e' a copia de quem escreve.
+# Verbatim DDL from acervo/esquema.sql for the table acervo-dedup owns.
+# Repeated here (not imported) because the three products are separate
+# repositories; esquema.sql is the contract, this is the writer's copy.
 _DDL_DUPLICATAS = """
 CREATE TABLE IF NOT EXISTS duplicatas (
   sha256         TEXT NOT NULL REFERENCES arquivos(sha256),
@@ -80,9 +80,9 @@ def _ensure_duplicatas(conn: sqlite3.Connection) -> None:
 def lookup_arquivos_por_sha256(
     conn: sqlite3.Connection, sha256_values: list[str]
 ) -> dict[str, ArquivoInfo]:
-    """Le em 'arquivos' as linhas cujo sha256 esta' na lista dada.
+    """Reads the 'arquivos' rows whose sha256 is in the given list.
 
-    Batching manual (SQLite tem limite de variaveis por statement)."""
+    Manual batching (SQLite caps the number of variables per statement)."""
     out: dict[str, ArquivoInfo] = {}
     CHUNK = 900
     for i in range(0, len(sha256_values), CHUNK):
@@ -109,13 +109,13 @@ def lookup_arquivos_por_sha256(
 def lookup_sinais_exif(
     conn: sqlite3.Connection, sha256_values: list[str]
 ) -> dict[str, dict[str, str]]:
-    """Le 'sinais' fonte='exif' para os sha256 dados.
+    """Reads 'sinais' with fonte='exif' for the given sha256 values.
 
-    Devolve {sha256: {chave: valor}}. Ausencia de linha significa "nao
-    medido ainda" (ver esquema.sql) - o chamador trata como neutro, nunca
-    como erro. Um banco de 'acervo' que ainda nao escreveu nenhum sinal
-    pode nem ter a tabela criada ainda - tratado do mesmo jeito: sem sinal
-    nenhum, nunca erro fatal."""
+    Returns {sha256: {key: value}}. A missing row means "not measured yet"
+    (see esquema.sql) - the caller treats it as neutral, never as an error.
+    An 'acervo' database that has not written any signal yet may not even
+    have the table - handled the same way: no signals at all, never a fatal
+    error."""
     out: dict[str, dict[str, str]] = {}
     if not sha256_values:
         return out
@@ -139,21 +139,21 @@ def lookup_sinais_exif(
 
 
 def linhas_para_duplicatas(grupos: list[GrupoDuplicata]) -> list[tuple]:
-    """Converte grupos em linhas de 'duplicatas' (sha256, grupo_id,
+    """Turns groups into 'duplicatas' rows (sha256, grupo_id,
     e_representante, metodo, distancia).
 
-    ARMADILHA evitada aqui: 'duplicatas' tem PRIMARY KEY (sha256, grupo_id).
-    Num grupo EXATO, TODOS os membros compartilham o MESMO sha256 (essa e'
-    a propria definicao de "byte-identico") - e' isso que faz o grupo
-    exato ser um so' registro possivel por (sha256, grupo_id), nao um por
-    copia fisica. As copias fisicas (quem e' representante, quais caminhos
-    vao pra quarentena) vivem no relatorio JSON, que e' de grao de
-    ARQUIVO; 'duplicatas' e' de grao de CONTEUDO. Escrever uma linha por
-    membro fisico de um grupo exato violaria a chave primaria (INSERT do
-    segundo membro colidiria com o primeiro).
+    TRAP avoided here: 'duplicatas' has PRIMARY KEY (sha256, grupo_id). In
+    an EXACT group ALL members share the SAME sha256 (that is the very
+    definition of "byte-identical"), which makes an exact group exactly one
+    possible record per (sha256, grupo_id), not one per physical copy. The
+    physical copies (which one is the representative, which paths go to
+    quarantine) live in the JSON report, whose grain is the FILE;
+    'duplicatas' has CONTENT grain. Writing one row per physical member of
+    an exact group would violate the primary key (the second member's
+    INSERT would collide with the first).
 
-    Num grupo PERCEPTUAL cada membro tem um sha256 DIFERENTE por definicao
-    (bytes diferentes, mesma imagem) - ai' sim uma linha por membro."""
+    In a PERCEPTUAL group each member has a DIFFERENT sha256 by definition
+    (different bytes, same image) - there, one row per member."""
     linhas: list[tuple] = []
     for g in grupos:
         if g.metodo == "exato":
@@ -168,14 +168,14 @@ def linhas_para_duplicatas(grupos: list[GrupoDuplicata]) -> list[tuple]:
 
 
 def replace_duplicatas(conn: sqlite3.Connection, rows: list[tuple]) -> None:
-    """Substitui o conteudo de 'duplicatas' pelo resultado desta varredura.
+    """Replaces the contents of 'duplicatas' with this scan's result.
 
-    Cada 'acervo-dedup scan' e' autoritativo sobre o estado atual do disco
-    varrido (mesma filosofia de reconciliacao do prototipo: o disco e' a
-    verdade). Uma varredura parcial (subconjunto de raizes) ainda assim
-    substitui a tabela inteira - documentado como limitacao conhecida em
-    README; mesclar resultados de varreduras parciais fica para uma versao
-    futura."""
+    Every 'acervo-dedup scan' is authoritative about the current state of
+    the scanned disk (same reconciliation philosophy as the prototype: the
+    disk is the truth). A partial scan (a subset of the roots) still
+    replaces the whole table - documented as a known limitation in the
+    README; merging results from partial scans is left for a future
+    version."""
     conn.execute("DELETE FROM duplicatas")
     conn.executemany(
         "INSERT INTO duplicatas (sha256, grupo_id, e_representante, metodo, distancia) "

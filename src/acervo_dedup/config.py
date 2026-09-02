@@ -1,8 +1,8 @@
-"""Carrega e valida a configuracao do acervo-dedup.
+"""Loads and validates the acervo-dedup configuration.
 
-Segue a mesma separacao do resto da suite acervo: a MEDIDA (sha256, phash,
-distancia de Hamming) e' universal e fica no codigo; o que este modulo
-carrega e' POLITICA (limiares, listas de editores, caminhos).
+Follows the same split as the rest of the acervo suite: MEASUREMENT
+(sha256, phash, Hamming distance) is universal and lives in the code;
+what this module loads is POLICY (thresholds, editor lists, paths).
 """
 
 from __future__ import annotations

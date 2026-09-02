@@ -31,7 +31,7 @@ def make_cfg(distancia_maxima=5, razao_aspecto_maxima=1.10):
 
 
 def hexhash(byte0=0, resto=0):
-    """hash perceptual sintetico de 64 bits (16 hex chars), controlavel."""
+    """Synthetic, controllable 64-bit perceptual hash (16 hex chars)."""
     b = bytes([byte0]) + bytes([resto]) * 7
     return b.hex()
 
@@ -41,7 +41,7 @@ class TestPerceptual(unittest.TestCase):
         af1 = ArquivoFisico("a.jpg", 100, mtime=10.0, sha256="H1")
         af2 = ArquivoFisico("b.jpg", 200, mtime=5.0, sha256="H2")
         info1 = ArquivoInfo("H1", "a.jpg", 100, 10.0, hexhash(0b00000000), 1000, 1000)
-        info2 = ArquivoInfo("H2", "b.jpg", 200, 5.0, hexhash(0b00000011), 1000, 1000)  # dist=2
+        info2 = ArquivoInfo("H2", "b.jpg", 200, 5.0, hexhash(0b00000011), 1000, 1000)  # distance=2
         cfg = make_cfg()
 
         grupos, stats = agrupar_perceptuais(
@@ -52,7 +52,7 @@ class TestPerceptual(unittest.TestCase):
         self.assertEqual(stats.sem_phash, 0)
         g = grupos[0]
         self.assertEqual(g.metodo, "perceptual")
-        # maior resolucao empatada -> desempata por mtime mais antigo: H2 (mtime=5)
+        # Resolution ties -> tie-break by oldest mtime: H2 (mtime=5).
         self.assertEqual(g.representante.sha256, "H2")
         self.assertEqual(g.candidatos_quarentena[0].distancia, 2.0)
 
@@ -60,7 +60,7 @@ class TestPerceptual(unittest.TestCase):
         af1 = ArquivoFisico("a.jpg", 100, mtime=10.0, sha256="H1")
         af2 = ArquivoFisico("b.jpg", 200, mtime=5.0, sha256="H2")
         info1 = ArquivoInfo("H1", "a.jpg", 100, 10.0, hexhash(0x00), 1000, 1000)
-        info2 = ArquivoInfo("H2", "b.jpg", 200, 5.0, hexhash(0xFF), 1000, 1000)  # dist=8
+        info2 = ArquivoInfo("H2", "b.jpg", 200, 5.0, hexhash(0xFF), 1000, 1000)  # distance=8
         cfg = make_cfg()
 
         grupos, stats = agrupar_perceptuais(
@@ -72,7 +72,7 @@ class TestPerceptual(unittest.TestCase):
         af1 = ArquivoFisico("a.jpg", 100, mtime=10.0, sha256="H1")
         af2 = ArquivoFisico("b.jpg", 200, mtime=5.0, sha256="H2")
         info1 = ArquivoInfo("H1", "a.jpg", 100, 10.0, hexhash(0x00), 1000, 1000)  # 1:1
-        info2 = ArquivoInfo("H2", "b.jpg", 200, 5.0, hexhash(0x03), 2000, 500)  # 4:1, dist=2
+        info2 = ArquivoInfo("H2", "b.jpg", 200, 5.0, hexhash(0x03), 2000, 500)  # 4:1, distance=2
         cfg = make_cfg()
 
         grupos, stats = agrupar_perceptuais(
@@ -84,7 +84,7 @@ class TestPerceptual(unittest.TestCase):
     def test_sem_phash_fica_fora_da_comparacao(self):
         af1 = ArquivoFisico("a.jpg", 100, mtime=10.0, sha256="H1")
         af2 = ArquivoFisico("b.jpg", 200, mtime=5.0, sha256="H2")
-        info1 = ArquivoInfo("H1", "a.jpg", 100, 10.0, None, 1000, 1000)  # sem phash
+        info1 = ArquivoInfo("H1", "a.jpg", 100, 10.0, None, 1000, 1000)  # no phash
         info2 = ArquivoInfo("H2", "b.jpg", 200, 5.0, hexhash(0x00), 1000, 1000)
         cfg = make_cfg()
 
