@@ -1,6 +1,6 @@
 # acervo-dedup
 
-Detecção de redundância em acervos grandes. CLI, sem interface.
+Detecção de redundância em acervos grandes. Aplicativo de janela no Windows, com o mesmo motor exposto como CLI.
 
 Responde a **uma** pergunta: *estes arquivos são o mesmo conteúdo?*
 
@@ -34,21 +34,58 @@ A separação é estrutural de propósito. Numa medição real numa pasta de ref
 
 Grava na tabela `duplicatas` do `acervo`. Também exporta relatório JSON com `duplicate_groups`, espaço recuperável e o representante de cada grupo.
 
+## Interface
+
+Janela nativa do Windows (WebView2, o runtime do Edge que já vem no Windows 11), servida por um servidor local que **só escuta em `127.0.0.1`**, com token de sessão gerado a cada início. Nada trafega para fora da máquina.
+
+A interface é uma **casca**: ela não contém nenhuma regra de detecção, de escolha de representante ou de destino. Ela executa `scan` e `isolar` como subprocesso e transmite o `stdout` deles ao vivo. Apagar a pasta `src/acervo_dedup/gui/` inteira não muda um bit do resultado do motor.
+
+O invariante "isola, nunca apaga" é o que a tela desenha:
+
+- **Não existe botão de apagar** em lugar nenhum da interface.
+- `isolar` abre sempre em **dry-run**. Mover de fato exige digitar `ISOLAR` num diálogo que diz quantos arquivos e para onde.
+- **Cor é semântica, não decoração.** A paleta vem de *Operários* (Tarsila do Amaral, 1933): ocre = certeza (cópia byte-idêntica, descarte seguro), terracota = semelhança (pode errar, decisão humana), tijolo = ação irreversível, céu = informação neutra.
+
+Quatro etapas, na ordem em que o erro fica mais caro: **Varredura → Resultado → Conferência → Isolar**. As três últimas ficam travadas até existir relatório.
+
 ## Instalação
 
-Requer **Python 3.10 ou mais novo** e Git. Testado no Windows 11 com Python 3.14.
+Requer **Windows 10/11 com o runtime WebView2** (já vem instalado no Windows 11) para a janela nativa. Para rodar do código-fonte ou usar só o CLI, requer **Python 3.10 ou mais novo**. Testado no Windows 11 com Python 3.14.
 
 São **dois programas**, e a ordem importa: `acervo` varre o disco, calcula SHA-256 e hash perceptual, e escreve o índice; `acervo-dedup` lê esse índice e decide o que é duplicata. A divisão existe para a imagem ser decodificada **uma vez só** pela suíte inteira — por isso `acervo-dedup` não depende de Pillow: ele lê `phash` do banco em vez de reabrir a foto.
+
+### Opção A — executável (uso normal)
+
+Descompacte `acervo-dedup-windows.zip` numa pasta e dê **duplo clique em `acervo-dedup-gui.exe`**. Não há instalador, não há registro no sistema, não há serviço em segundo plano: apagar a pasta desinstala.
+
+A pasta traz **dois binários**, e os dois são necessários:
+
+| binário | subsistema | papel |
+|---|---|---|
+| `acervo-dedup-gui.exe` | janela | é o que você abre; não mostra console |
+| `acervo-dedup.exe` | console | é o motor; a janela o executa e lê o `stdout` dele para o log ao vivo |
+
+Não separe os dois nem renomeie o segundo — a janela procura `acervo-dedup.exe` ao lado dela.
+
+### Opção B — do código-fonte
+
+Os dois repositórios são **privados** (código fechado, Obsn Studios): o `clone` exige credencial com acesso.
 
 ```bash
 git clone https://github.com/ferlief/acervo.git
 git clone https://github.com/ferlief/acervo-dedup.git
-
-pip install -e ./acervo
-pip install -e ./acervo-dedup
 ```
 
-Os dois repositórios são **privados** (código fechado, Obsn Studios): o `clone` exige credencial com acesso. A distribuição para quem não tem acesso ao código é executável empacotado, não `git clone` — ainda não existe.
+Use um ambiente virtual — instalar pacote em Python global é como escrever direto no acervo: funciona até o dia em que outro projeto pede outra versão.
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e ./acervo
+pip install -e "./acervo-dedup[gui]"
+```
+
+O extra `[gui]` traz o `pywebview` (a janela nativa). Sem ele o motor e o CLI funcionam igual, e `gui` cai para o navegador — a dependência de janela é opcional de propósito: uma varredura de HD externo por SSH não precisa de toolkit gráfico instalado.
 
 Confirme que instalou:
 
@@ -59,7 +96,33 @@ python -m acervo_dedup.cli --help
 
 **No Windows, `pip` costuma avisar que a pasta `Scripts` não está no PATH.** Se `acervo-dedup` não for reconhecido como comando, use a forma `python -m acervo_dedup.cli ...` — funciona sempre, sem mexer no PATH. Todos os exemplos abaixo usam essa forma.
 
-## Uso
+### Gerar o executável
+
+```bash
+pip install -e ".[build]"
+python -m PyInstaller --noconfirm --clean packaging/acervo-dedup.spec
+```
+
+Sai em `dist/acervo-dedup/` (~36 MB). É `onedir`, não `onefile`, de propósito: a janela executa o CLI uma vez por varredura, e um `onefile` reextrairia o pacote inteiro para uma pasta temporária a cada execução.
+
+## Uso pela interface
+
+Abra `acervo-dedup-gui.exe`. As quatro etapas do trilho lateral são a ordem correta, e cada uma só destrava quando a anterior produziu resultado:
+
+1. **Varredura** — informe as raízes (ou deixe vazio para usar a config) e clique em *Iniciar varredura*. A saída do motor aparece linha a linha. Nada é movido nesta etapa.
+2. **Resultado** — quanto dá para recuperar, separado em `quarentena` (cópia byte-idêntica) e `revisao` (parecida). Erros de leitura ficam listados aqui, não escondidos.
+3. **Conferência** — grupo a grupo, com o representante, o motivo da escolha e a distância de cada candidato. Filtre por método, ordene por espaço, busque por caminho ou `sha256`. **Vale conferir a olho os grupos perceptuais** — são os falíveis.
+4. **Isolar** — comece por *Simular*. Se a lista fizer sentido, *Mover de fato* pede a palavra `ISOLAR` digitada.
+
+Para apontar outra configuração, abra pelo terminal:
+
+```bash
+acervo-dedup-gui.exe --config dedup-config.yaml
+```
+
+## Uso pelo CLI
+
+O mesmo motor, sem janela. É o caminho para automação, máquina remota e scripts.
 
 ### 1. Configurar
 
@@ -120,16 +183,34 @@ Isso **não é descarte** — é fila de decisão. Olhe a pasta `revisao` e devo
 
 O programa nunca apaga. Depois de conferir a quarentena, apagar a pasta é uma escolha sua, fora da ferramenta. É esse passo que recupera o espaço em disco.
 
+## Desenvolvimento
+
+```bash
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install -e ".[build]"
+python -m unittest discover -s tests
+```
+
+A suíte cobre a política de representante, os dois agrupamentos, o roteamento entre os dois destinos e um teste de ponta a ponta com disco e SQLite reais. **Qualquer mudança em `quality.py` ou `quarantine.py` roda a suíte antes do commit, não depois** — é onde o erro custa dado perdido.
+
+Convenções (detalhe em `CONTRIBUTING.md`):
+
+- **Commits em inglês**, Conventional Commits, modo imperativo.
+- **Comentários e docstrings em inglês.** Identificadores e texto de interface continuam em português.
+- A camada `gui/` não pode importar `exact`, `perceptual`, `quality` nem `quarantine`. Se precisar, a regra está no lugar errado.
+
 ## Estado
 
-**Implementado.** CLI em Python (`src/acervo_dedup/`), portado das oito iterações do protótipo de origem (`acervo-prototipo/dedup_fase1.py` … `dedup_fase8.py`), não copiado — a passada exata e a perceptual usam a mesma lógica testada em disco real (triagem por tamanho, SHA-256 em blocos, hash perceptual com indexação multi-partição/LSH, guarda de proporção), adaptada ao contrato de `acervo/esquema.sql`.
+**Implementado.** Motor em Python (`src/acervo_dedup/`), portado das oito iterações do protótipo de origem (`acervo-prototipo/dedup_fase1.py` … `dedup_fase8.py`), não copiado — a passada exata e a perceptual usam a mesma lógica testada em disco real (triagem por tamanho, SHA-256 em blocos, hash perceptual com indexação multi-partição/LSH, guarda de proporção), adaptada ao contrato de `acervo/esquema.sql`.
 
 Duas diferenças deliberadas em relação ao protótipo, exigidas pelo contrato da suite:
 
 - A passada perceptual **lê** `phash`/`largura`/`altura` de `arquivos` em vez de reabrir a imagem — é o próprio propósito de `sinais(fonte=exif)` no esquema: dar a este programa o que ele precisa sem redecodificar.
 - A política de representante é mais específica que a descrita acima: grupo exato usa a data de criação mais antiga; grupo perceptual usa qualidade mensurável (RAW > resolução > original-vs-edição via EXIF Software > menor perda de compressão via soma de quantização JPEG), com desempate por data. Ver `src/acervo_dedup/quality.py`.
 
-Comandos: `acervo-dedup scan` (detecta e grava relatório + `duplicatas`, nunca move nada) e `acervo-dedup isolar` (move para `quarentena`/`revisao` conforme o grau de certeza, dry-run por padrão, `--execute` para mover de fato, `--somente` para tratar uma classe por vez). `python -m unittest discover -s tests` cobre a política de representante, os dois agrupamentos, o roteamento entre os dois destinos e um teste de ponta a ponta com disco e SQLite reais.
+Comandos: `acervo-dedup scan` (detecta e grava relatório + `duplicatas`, nunca move nada), `acervo-dedup isolar` (move para `quarentena`/`revisao` conforme o grau de certeza, dry-run por padrão, `--execute` para mover de fato, `--somente` para tratar uma classe por vez) e `acervo-dedup gui` (janela nativa; `--navegador` força a aba do navegador).
+
+A interface gráfica (`src/acervo_dedup/gui/`) é posterior ao motor e não o alterou: ela executa os dois comandos acima como subprocesso. O empacotamento para Windows está em `packaging/`.
 
 ## Licença e monetização
 
