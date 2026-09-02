@@ -48,26 +48,29 @@ def abrir_janela(config_path: str | None, porta: int = 0) -> int:
     servico = montar(config_path, porta)
     servir_em_thread(servico)
 
-    janela = webview.create_window(
-        "acervo-dedup",
-        servico.url,
-        width=LARGURA,
-        height=ALTURA,
-        min_size=(LARGURA_MINIMA, ALTURA_MINIMA),
-        background_color="#131010",   # matches the dark theme: no white flash on open
-        text_select=True,             # paths in the report have to be copyable
-        confirm_close=False,
-    )
-
     def _ao_fechar() -> None:
         # Closing the window ends the session: the server dies with it, and
         # a running scan is cancelled rather than orphaned holding the cache
         # SQLite open.
         servico.encerrar()
 
-    janela.events.closed += _ao_fechar
-
+    # create_window belongs inside the guard, not outside it: a rejected
+    # keyword or a missing backend raises HERE, and in a windowed binary
+    # there is no console for that traceback to land in - the program would
+    # simply vanish with no window and no message. Falling back to the
+    # browser turns a silent death into a working interface.
     try:
+        janela = webview.create_window(
+            "acervo-dedup",
+            servico.url,
+            width=LARGURA,
+            height=ALTURA,
+            min_size=(LARGURA_MINIMA, ALTURA_MINIMA),
+            background_color="#131010",  # matches the dark theme: no white flash
+            text_select=True,            # paths in the report have to be copyable
+            confirm_close=False,
+        )
+        janela.events.closed += _ao_fechar
         # gui=None lets pywebview pick its backend; on Windows that is
         # 'edgechromium' (WebView2), preinstalled on Windows 11.
         webview.start()

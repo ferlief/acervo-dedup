@@ -74,7 +74,17 @@ def _cmd_scan(args: argparse.Namespace) -> int:
     ]
     sobreviventes = [a for a in sobreviventes if a.sha256]
 
-    conn = db.connect(cfg.banco_caminho)
+    # db.connect already explains itself well; what it does not do is stop a
+    # traceback from being the first thing a first-time user sees. Missing
+    # index is the single most likely failure on a first run - it deserves an
+    # instruction, not a stack trace.
+    try:
+        conn = db.connect(cfg.banco_caminho)
+    except (FileNotFoundError, RuntimeError) as e:
+        print(f"\n[ERRO] {e}")
+        print("\n>>> A ordem e': 'acervo indexar' primeiro, 'acervo-dedup scan' depois. <<<")
+        return 1
+
     try:
         sha_list = [a.sha256 for a in sobreviventes]
         arquivos_info = db.lookup_arquivos_por_sha256(conn, sha_list)
