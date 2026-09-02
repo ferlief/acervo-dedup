@@ -12,8 +12,19 @@ dependencies = [
     "PyYAML>=6.0",
 ]
 
+# The engine has no GUI dependency on purpose: a headless "scan" over an
+# external drive must not need a window toolkit installed to run.
+[project.optional-dependencies]
+gui = ["pywebview>=5.0"]
+build = ["pywebview>=5.0", "pyinstaller>=6.0"]
+
 [project.scripts]
 acervo-dedup = "acervo_dedup.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+# The local GUI ships as static files inside the package; without this
+# they are dropped by a wheel build and "acervo-dedup gui" 404s.
+[tool.setuptools.package-data]
+"acervo_dedup.gui" = ["static/*"]

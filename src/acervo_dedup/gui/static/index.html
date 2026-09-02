@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-tema="escuro">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>acervo-dedup</title>
+    <link rel="stylesheet" href="/estatico/app.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23d3a03f'/%3E%3Crect x='6' y='18' width='4' height='9' fill='%2317130f'/%3E%3Crect x='14' y='14' width='4' height='13' fill='%2317130f'/%3E%3Crect x='22' y='20' width='4' height='7' fill='%2317130f'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body data-token="__TOKEN__">
+    <div class="app">
+      <!-- ================= side rail ================= -->
+      <aside class="trilho">
+        <div class="marca">
+          <div class="marca-selo" aria-hidden="true"></div>
+          <div class="marca-texto">
+            <span class="marca-nome">acervo<span>·</span>dedup</span>
+            <span class="marca-sub">Obsn Studios</span>
+          </div>
+        </div>
+
+        <div>
+          <p class="trilho-titulo">Fluxo</p>
+          <nav class="passos" id="passos" aria-label="Etapas">
+            <button class="passo" data-tela="varredura" aria-current="page">
+              <span class="passo-num"><span>1</span></span>
+              <span class="passo-rotulo">
+                <span class="passo-nome">Varredura</span>
+                <span class="passo-dica">detecta, não move nada</span>
+              </span>
+            </button>
+            <button class="passo" data-tela="resultado" disabled>
+              <span class="passo-num"><span>2</span></span>
+              <span class="passo-rotulo">
+                <span class="passo-nome">Resultado</span>
+                <span class="passo-dica">espaço por grau de certeza</span>
+              </span>
+            </button>
+            <button class="passo" data-tela="grupos" disabled>
+              <span class="passo-num"><span>3</span></span>
+              <span class="passo-rotulo">
+                <span class="passo-nome">Conferência</span>
+                <span class="passo-dica">grupo a grupo, com motivo</span>
+              </span>
+            </button>
+            <button class="passo" data-tela="isolar" disabled>
+              <span class="passo-num"><span>4</span></span>
+              <span class="passo-rotulo">
+                <span class="passo-nome">Isolar</span>
+                <span class="passo-dica">move, nunca apaga</span>
+              </span>
+            </button>
+          </nav>
+        </div>
+
+        <div class="trilho-rodape">
+          <p class="trilho-titulo">Configuração ativa</p>
+          <div class="config-cartao" id="config-cartao">
+            <div class="config-linha">
+              <span class="config-chave">config</span>
+              <span class="config-valor" id="cfg-caminho">padrões</span>
+            </div>
+            <div class="config-linha">
+              <span class="config-chave">banco</span>
+              <span class="config-valor" id="cfg-banco">—</span>
+            </div>
+            <div class="config-linha">
+              <span class="config-chave">raízes</span>
+              <span class="config-valor" id="cfg-raizes">—</span>
+            </div>
+            <div class="config-linha">
+              <span class="config-chave">distância</span>
+              <span class="config-valor" id="cfg-distancia">—</span>
+            </div>
+          </div>
+          <div class="linha-acoes">
+            <button class="btn btn-fantasma btn-icone" id="btn-tema" title="Alternar tema" aria-label="Alternar tema">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+              </svg>
+            </button>
+            <span class="tenue mono" style="font-size: 11px">v0.1.0 · local</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- ================= stage ================= -->
+      <main class="palco">
+        <header class="topo">
+          <div>
+            <h1 id="titulo">Varredura</h1>
+            <p id="subtitulo">Duas passadas sobre o disco. Nada é movido nesta etapa.</p>
+          </div>
+          <div class="topo-acoes">
+            <span class="selo selo-neutro" id="selo-estado">
+              <span class="selo-ponto"></span><span id="selo-texto">ocioso</span>
+            </span>
+            <button class="btn btn-fantasma" id="btn-cancelar" hidden>Cancelar</button>
+          </div>
+        </header>
+
+        <div class="conteudo">
+          <!-- ---------------- 1. scan ---------------- -->
+          <section class="tela ativa" id="tela-varredura">
+            <div class="secao">
+              <div class="cartao">
+                <div class="cartao-cabeca">
+                  <div>
+                    <h2 class="cartao-titulo">Detectar redundância</h2>
+                    <p class="cartao-desc">
+                      Passada exata (triagem por tamanho + SHA-256) e passada perceptual
+                      (phash lido do índice). Grava a tabela <code class="mono">duplicatas</code>
+                      e o relatório JSON.
+                    </p>
+                  </div>
+                  <span class="selo selo-info"><span class="selo-ponto"></span>somente leitura do disco</span>
+                </div>
+
+                <div class="campos">
+                  <div class="campo">
+                    <label class="campo-rotulo" for="raizes">Raízes a varrer</label>
+                    <input
+                      class="entrada"
+                      id="raizes"
+                      placeholder="deixe vazio para usar varredura.raizes da config"
+                      spellcheck="false"
+                    />
+                    <span class="campo-ajuda">
+                      Uma por linha ou separadas por <code class="mono">;</code>. Preenchido aqui,
+                      sobrepõe a config — equivale a <code class="mono">--raiz</code>.
+                    </span>
+                  </div>
+                </div>
+
+                <div class="linha-acoes" style="margin-top: 18px">
+                  <button class="btn btn-primario btn-grande" id="btn-scan">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="M20 20l-3.5-3.5" />
+                    </svg>
+                    Iniciar varredura
+                  </button>
+                  <span class="tenue" style="font-size: 12.5px">
+                    Centenas de milhares de arquivos levam minutos. Pode acompanhar abaixo.
+                  </span>
+                </div>
+              </div>
+
+              <div class="console" id="console-scan">
+                <div class="console-barra">
+                  <div class="console-titulo">
+                    <span>saída do motor</span>
+                    <b id="console-comando">acervo-dedup scan</b>
+                  </div>
+                  <button class="btn btn-fantasma" id="btn-limpar" style="padding: 4px 10px; font-size: 12px">
+                    Rolagem automática: ligada
+                  </button>
+                </div>
+                <div class="barra-atividade" id="barra-atividade" hidden></div>
+                <pre class="console-corpo" id="console-corpo" hidden></pre>
+                <div class="console-vazio" id="console-vazio">
+                  <p>A saída de <span class="mono">acervo-dedup scan</span> aparece aqui, linha a linha.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ---------------- 2. result ---------------- -->
+          <section class="tela" id="tela-resultado">
+            <div class="secao">
+              <p class="secao-titulo">Espaço recuperável, separado por grau de certeza</p>
+              <div class="destinos">
+                <article class="destino d-quarentena">
+                  <div class="destino-cabeca">
+                    <span class="destino-nome">quarentena</span>
+                    <span class="selo selo-quarentena"><span class="selo-ponto"></span>descarte seguro</span>
+                  </div>
+                  <div>
+                    <span class="destino-num" id="q-gb">0,00</span>
+                    <span class="metrica-unidade">GB</span>
+                  </div>
+                  <p class="destino-desc">
+                    <b id="q-arquivos">0</b> arquivo(s) byte-idênticos. Ou o SHA-256 bate ou não bate:
+                    não existe falso positivo possível aqui.
+                  </p>
+                  <p class="destino-caminho" id="q-caminho">—</p>
+                </article>
+
+                <article class="destino d-revisao">
+                  <div class="destino-cabeca">
+                    <span class="destino-nome">revisão</span>
+                    <span class="selo selo-revisao"><span class="selo-ponto"></span>decisão humana</span>
+                  </div>
+                  <div>
+                    <span class="destino-num" id="r-gb">0,00</span>
+                    <span class="metrica-unidade">GB</span>
+                  </div>
+                  <p class="destino-desc">
+                    <b id="r-arquivos">0</b> arquivo(s) parecidos, não idênticos. Semelhança erra —
+                    pode ser rajada, pode ser foto única.
+                  </p>
+                  <p class="destino-caminho" id="r-caminho">—</p>
+                </article>
+              </div>
+            </div>
+
+            <div class="secao">
+              <p class="secao-titulo">Varredura</p>
+              <div class="grade-metricas">
+                <div class="metrica destaque-quarentena">
+                  <p class="metrica-rotulo">Grupos exatos</p>
+                  <p class="metrica-valor" id="m-grupos-exatos">0</p>
+                  <p class="metrica-nota">SHA-256 idêntico</p>
+                </div>
+                <div class="metrica destaque-revisao">
+                  <p class="metrica-rotulo">Grupos perceptuais</p>
+                  <p class="metrica-valor" id="m-grupos-perceptuais">0</p>
+                  <p class="metrica-nota">distância de Hamming no limiar</p>
+                </div>
+                <div class="metrica destaque-info">
+                  <p class="metrica-rotulo">Recuperável total</p>
+                  <p class="metrica-valor">
+                    <span id="m-total-gb">0,00</span><span class="metrica-unidade">GB</span>
+                  </p>
+                  <p class="metrica-nota" id="m-total-arquivos">0 arquivo(s) propostos</p>
+                </div>
+                <div class="metrica">
+                  <p class="metrica-rotulo">Erros de leitura</p>
+                  <p class="metrica-valor" id="m-erros">0</p>
+                  <p class="metrica-nota">bloqueado ou sem permissão</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="secao">
+              <div class="aviso a-quarentena">
+                <svg class="aviso-icone" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                <div>
+                  <strong>Nada foi movido.</strong> A varredura só escreve na tabela
+                  <span class="mono">duplicatas</span> e no relatório JSON
+                  (<span class="mono" id="rel-caminho">—</span>, gerado em
+                  <span class="mono" id="rel-data">—</span>). O motor isola; apagar é sempre um
+                  passo seu, fora da ferramenta.
+                </div>
+              </div>
+              <div class="aviso" id="aviso-erros" hidden>
+                <svg class="aviso-icone" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                  <circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16h.01" />
+                </svg>
+                <div>
+                  <strong id="erros-titulo">0 arquivo(s) com erro de leitura</strong> — não entraram
+                  na comparação. Falha de I/O vira registro, nunca derruba a varredura.
+                  <details style="margin-top: 6px">
+                    <summary class="tenue" style="cursor: pointer; font-size: 12px">ver caminhos</summary>
+                    <pre class="mono tenue" id="erros-lista" style="margin: 6px 0 0; white-space: pre-wrap; word-break: break-all; max-height: 180px; overflow: auto"></pre>
+                  </details>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ---------------- 3. groups ---------------- -->
+          <section class="tela" id="tela-grupos">
+            <div class="filtros">
+              <div class="busca">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />
+                </svg>
+                <input class="entrada" id="busca" placeholder="filtrar por caminho ou sha256…" spellcheck="false" />
+              </div>
+              <div class="segmentado" id="filtro-metodo" role="group" aria-label="Método">
+                <button data-metodo="todos" aria-pressed="true">Todos</button>
+                <button data-metodo="exato" aria-pressed="false">Exatos</button>
+                <button data-metodo="perceptual" aria-pressed="false">Perceptuais</button>
+              </div>
+              <div class="segmentado" id="filtro-ordem" role="group" aria-label="Ordenação">
+                <button data-ordem="espaco" aria-pressed="true">Maior espaço</button>
+                <button data-ordem="membros" aria-pressed="false">Mais cópias</button>
+              </div>
+              <span class="espacador"></span>
+              <span class="tenue" id="grupos-contagem">—</span>
+            </div>
+
+            <div class="grupos" id="grupos"></div>
+
+            <div class="paginacao" id="paginacao" hidden>
+              <button class="btn btn-fantasma" id="pag-anterior">← Anterior</button>
+              <span id="pag-info">página 1 de 1</span>
+              <button class="btn btn-fantasma" id="pag-proxima">Próxima →</button>
+            </div>
+          </section>
+
+          <!-- ---------------- 4. isolate ---------------- -->
+          <section class="tela" id="tela-isolar">
+            <div class="secao">
+              <div class="aviso a-perigo">
+                <svg class="aviso-icone" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                  <path d="M10.3 3.9 2.4 17.2A1.9 1.9 0 0 0 4 20h16a1.9 1.9 0 0 0 1.6-2.8L13.7 3.9a1.9 1.9 0 0 0-3.4 0z" />
+                  <path d="M12 9v4M12 17h.01" />
+                </svg>
+                <div>
+                  <strong>Isolar move arquivos.</strong> Não apaga: a estrutura de subpastas é
+                  preservada e colisão de nome ganha sufixo <span class="mono">_dup1</span>.
+                  Toda execução começa em <b>dry-run</b> — só a confirmação digitada libera o
+                  <span class="mono">--execute</span>.
+                </div>
+              </div>
+            </div>
+
+            <div class="secao">
+              <p class="secao-titulo">Escolha a classe</p>
+              <div class="destinos">
+                <article class="destino d-quarentena">
+                  <div class="destino-cabeca">
+                    <span class="destino-nome">quarentena</span>
+                    <span class="selo selo-quarentena"><span class="selo-ponto"></span>seguro</span>
+                  </div>
+                  <div><span class="destino-num" id="i-q-arquivos">0</span> <span class="metrica-unidade">arquivo(s)</span></div>
+                  <p class="destino-desc">Cópias byte-idênticas. É o descarte que dá para esvaziar sem olhar foto por foto.</p>
+                  <p class="destino-caminho" id="i-q-caminho">—</p>
+                  <div class="destino-acoes">
+                    <button class="btn" data-isolar="quarentena" data-modo="dry">Simular</button>
+                    <button class="btn btn-perigo" data-isolar="quarentena" data-modo="exec">Mover de fato</button>
+                  </div>
+                </article>
+
+                <article class="destino d-revisao">
+                  <div class="destino-cabeca">
+                    <span class="destino-nome">revisão</span>
+                    <span class="selo selo-revisao"><span class="selo-ponto"></span>você decide</span>
+                  </div>
+                  <div><span class="destino-num" id="i-r-arquivos">0</span> <span class="metrica-unidade">arquivo(s)</span></div>
+                  <p class="destino-desc">
+                    Parecidas, não idênticas. Fila de decisão: o que for foto única volta para o acervo.
+                  </p>
+                  <p class="destino-caminho" id="i-r-caminho">—</p>
+                  <div class="destino-acoes">
+                    <button class="btn" data-isolar="revisao" data-modo="dry">Simular</button>
+                    <button class="btn btn-perigo" data-isolar="revisao" data-modo="exec">Mover de fato</button>
+                  </div>
+                </article>
+              </div>
+            </div>
+
+            <div class="secao">
+              <div class="console" id="console-isolar">
+                <div class="console-barra">
+                  <div class="console-titulo">
+                    <span>saída do motor</span>
+                    <b id="console-isolar-comando">acervo-dedup isolar</b>
+                  </div>
+                </div>
+                <div class="barra-atividade" id="barra-atividade-isolar" hidden></div>
+                <pre class="console-corpo" id="console-isolar-corpo" hidden></pre>
+                <div class="console-vazio" id="console-isolar-vazio">
+                  <p>Comece pela simulação. Ela lista exatamente o que seria movido, sem tocar em nada.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <!-- ================= confirmation modal ================= -->
+    <div class="modal-fundo" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
+      <div class="modal">
+        <h2 id="modal-titulo">Mover de fato?</h2>
+        <p id="modal-texto">—</p>
+        <div class="aviso a-perigo" id="modal-aviso">
+          <svg class="aviso-icone" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16h.01" />
+          </svg>
+          <div id="modal-aviso-texto">
+            Isso move arquivos no disco. O motor não apaga nada — mas mover centenas de milhares
+            de arquivos leva tempo e não tem botão de desfazer.
+          </div>
+        </div>
+        <div class="campo">
+          <label class="campo-rotulo" for="modal-confirmacao">
+            Digite <b class="mono">ISOLAR</b> para liberar
+          </label>
+          <input class="entrada" id="modal-confirmacao" autocomplete="off" spellcheck="false" placeholder="ISOLAR" />
+        </div>
+        <div class="modal-acoes">
+          <button class="btn btn-fantasma" id="modal-cancelar">Cancelar</button>
+          <button class="btn btn-perigo" id="modal-confirmar" disabled>Mover de fato</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="torradas" id="torradas" aria-live="polite"></div>
+
+    <script src="/estatico/app.js"></script>
+  </body>
+</html>

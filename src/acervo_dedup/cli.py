@@ -1,13 +1,20 @@
-"""CLI do acervo-dedup.
+"""acervo-dedup command line.
 
-  acervo-dedup scan [--config config.yaml] [--raiz DIR ...] [--execute-nada]
-  acervo-dedup isolar --relatorio dedup_report.json [--execute]
+  acervo-dedup scan   [--config config.yaml] [--raiz DIR ...]
+  acervo-dedup isolar [--relatorio dedup_report.json] [--execute]
+  acervo-dedup gui    [--navegador] [--porta N]
 
-'scan' SO' detecta: varre o disco, roda as duas passadas, grava em
-'duplicatas' e exporta o relatorio JSON. Nunca move arquivo nenhum.
-'isolar' e' o unico comando que move, e so' quando chamado explicitamente
-com --execute (sem a flag, roda em dry-run e so' mostra o que faria) -
-'CLI, sem interface': tudo por linha de comando, nada automatico.
+'scan' ONLY detects: it walks the disk, runs both passes, writes to the
+'duplicatas' table and exports the JSON report. It never moves a file.
+'isolar' is the only command that moves anything, and only when called
+explicitly with --execute (without the flag it is a dry run that just
+prints what it would do).
+
+'gui' opens the graphical interface in a native Windows window (WebView2),
+backed by a server bound to 127.0.0.1 only. The interface is a SKIN: it
+shells out to these very same subcommands, so it cannot move a file through
+any path the CLI does not already expose. Running acervo-dedup with no
+arguments at all - what a double-click on the .exe does - opens it too.
 """
 
 from __future__ import annotations
@@ -177,10 +184,23 @@ def _cmd_isolar(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_gui(args: argparse.Namespace) -> int:
+    """Imported lazily: the GUI pulls in http.server and friends, and a
+    plain 'scan' on a big drive should not pay for that import."""
+    if args.navegador:
+        from .gui import servir
+
+        return servir(args.config, porta=args.porta or 8765, abrir=not args.nao_abrir)
+
+    from .gui import abrir_janela
+
+    return abrir_janela(args.config, porta=args.porta or 0)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="acervo-dedup",
-        description="Deteccao de redundancia em acervos grandes. CLI, sem interface.",
+        description="Deteccao de redundancia em acervos grandes. CLI com interface local opcional.",
     )
     parser.add_argument("--config", default=None, help="Caminho do config.yaml (opcional).")
     sub = parser.add_subparsers(dest="comando", required=True)
@@ -206,11 +226,30 @@ def build_parser() -> argparse.ArgumentParser:
     p_isolar.add_argument("--execute", action="store_true", help="Move de fato. Sem a flag, dry-run.")
     p_isolar.set_defaults(func=_cmd_isolar)
 
+    p_gui = sub.add_parser(
+        "gui",
+        help="Abre a interface numa janela do Windows (so' 127.0.0.1).",
+    )
+    p_gui.add_argument("--porta", type=int, default=None,
+                       help="Porta do servidor local. Padrao: qualquer livre "
+                            "(janela nativa) ou 8765 (--navegador).")
+    p_gui.add_argument("--navegador", action="store_true",
+                       help="Abre no navegador em vez da janela nativa.")
+    p_gui.add_argument("--nao-abrir", action="store_true",
+                       help="Com --navegador, so' imprime a URL em vez de abrir.")
+    p_gui.set_defaults(func=_cmd_gui)
+
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
+    argv = sys.argv[1:] if argv is None else argv
+    # Double-clicking acervo-dedup.exe passes no arguments. A CLI would print
+    # usage into a console nobody sees; the sensible thing there is to open
+    # the interface. Every explicit invocation keeps CLI behaviour untouched.
+    if not argv:
+        argv = ["gui"]
     args = parser.parse_args(argv)
     return args.func(args)
 

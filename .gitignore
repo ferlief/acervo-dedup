@@ -60,3 +60,8 @@ __pycache__/
 dedup_report.json
 dedup_scan_cache.sqlite3
 _quarentena_dedup/
+_revisao_dedup/
+
+# PyInstaller escreve o .spec gerado na raiz quando invocado sem o nosso;
+# o spec versionado e' o de packaging/.
+/acervo-dedup.spec
