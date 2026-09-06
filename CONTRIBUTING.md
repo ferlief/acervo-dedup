@@ -1,8 +1,8 @@
-# Contribuindo com acervo-dedup
+# Contributing to acervo-dedup
 
-## Mensagens de commit
+## Commit messages
 
-**Inglês, sempre — [Conventional Commits](https://www.conventionalcommits.org/), modo imperativo.** Não depende de o repositório ser fechado ou ter audiência externa — é o padrão de quem programa de forma séria hoje, independentemente de quem lê depois. Identificador continua em português; comentário e docstring também são em inglês (ver abaixo).
+**English, always — [Conventional Commits](https://www.conventionalcommits.org/), imperative mood.** This doesn't depend on whether the repo is closed or has an external audience — it's the standard for anyone programming seriously today, regardless of who reads it later. Identifiers stay in Portuguese; comments and docstrings are also in English (see below).
 
 ```
 <type>(<scope>): short imperative summary, ≤50 chars
@@ -11,30 +11,30 @@ Body explaining WHY this change exists, not what changed — the diff
 already shows what. Wrap at ~72 columns.
 ```
 
-Tipos comuns: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `build`, `ci`.
+Common types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `build`, `ci`.
 
-Referências: [conventionalcommits.org](https://www.conventionalcommits.org/) para o formato, as 7 regras de Chris Beams ("How to Write a Git Commit Message") para a prosa. Sem linha de atribuição a ferramenta de geração de código.
+References: [conventionalcommits.org](https://www.conventionalcommits.org/) for the format, Chris Beams's seven rules ("How to Write a Git Commit Message") for the prose. No attribution line for code-generation tools.
 
-## Comentários e docstrings
+## Comments and docstrings
 
-**Inglês, sempre.** Pela mesma razão da mensagem de commit: é o padrão de quem programa de forma séria, e não depende de quem lê depois.
+**English, always.** Same reason as commit messages: it's the standard for anyone programming seriously, regardless of who reads it later.
 
-O que **não** muda de idioma:
+What doesn't change language:
 
-| superfície | idioma | por quê |
+| surface | language | why |
 |---|---|---|
-| comentário, docstring, mensagem de commit | inglês | público técnico, indeterminado |
-| identificador (`agrupar_exatas`, `quarentena_dir`) | português | renomear é refatoração de risco, e o vocabulário do domínio é o do acervo |
-| saída do CLI, texto de interface, README | português | a usuária é brasileira; a ferramenta fala com ela |
+| comment, docstring, commit message, README, project docs | English | technical/portfolio audience, not necessarily Brazilian |
+| identifier (`agrupar_exatas`, `quarentena_dir`) | Portuguese | renaming is risky refactoring, and the domain vocabulary belongs to the acervo |
+| CLI output, interface text | Portuguese | the user is Brazilian; the tool speaks to her |
 
-Um comentário existe para explicar **por que**, não o quê. Se ele estiver descrevendo o que a linha faz, o problema é a linha.
+A comment exists to explain **why**, not what. If it's describing what the line does, the line is the problem.
 
-## Antes de abrir um PR
+## Before opening a PR
 
-O custo do erro aqui é o mais alto da suíte: apagar o original é irreversível (ver `CLAUDE.md`). Qualquer mudança em `quality.py` (política de representante) ou em `quarantine.py` merece rodar `python -m unittest discover -s tests` — a suíte já cobre disco e SQLite reais, não só dado sintético — antes do PR, não depois.
+The cost of a mistake here is the highest in the suite: deleting the original is irreversible (see `CLAUDE.md`). Any change to `quality.py` (representative policy) or `quarantine.py` deserves a run of `python -m unittest discover -s tests` — the suite already covers real disk and SQLite, not just synthetic data — before the PR, not after.
 
-## A camada gráfica
+## The graphical layer
 
-`src/acervo_dedup/gui/` é **apresentação, e só**. A regra que a mantém honesta: ela não importa `exact`, `perceptual`, `quality` nem `quarantine` — executa `acervo-dedup scan` e `acervo-dedup isolar` como subprocesso e transmite o `stdout`.
+`src/acervo_dedup/gui/` is presentation, and only that. The rule that keeps it honest: it doesn't import `exact`, `perceptual`, `quality`, or `quarantine` — it runs `acervo-dedup scan` and `acervo-dedup isolar` as a subprocess and streams their `stdout`.
 
-Isso não é purismo arquitetural, é o invariante 1 sobrevivendo à existência de botões: se a única forma de mover arquivo é o comando que já era auditável, nenhum bug de interface inventa um caminho novo até o disco. Uma regra de decisão que aparecer nessa pasta está no lugar errado.
+This isn't architectural purism, it's invariant 1 surviving the existence of buttons: if the only way to move a file is through the command that was already auditable, no interface bug can invent a new path to disk. Any decision rule that shows up in this folder is in the wrong place.

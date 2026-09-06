@@ -1,82 +1,82 @@
 # acervo-dedup
 
-Detecção de redundância em acervos grandes. Aplicativo de janela no Windows, com o mesmo motor exposto como CLI.
+Redundancy detection in large photo collections. Windows desktop app, with the same engine exposed as a CLI.
 
-Responde a **uma** pergunta: *estes arquivos são o mesmo conteúdo?*
+Answers **one** question: *are these files the same content?*
 
-## Duas passadas
+## Two passes
 
-1. **Exata** — triagem por tamanho em bytes (arquivo de tamanho único é descartado sem I/O), depois SHA-256 em blocos para os candidatos. Agnóstico a nome de arquivo, que costuma estar caótico depois de recuperação de disco.
-2. **Perceptual** — hash perceptual para pegar recompressão, redimensionamento e captura de tela da mesma foto, que a passada exata não vê.
+1. **Exact** — screened by byte size first (a file with a unique size is discarded without any I/O), then block-wise SHA-256 for the remaining candidates. Filename-agnostic, since names are usually chaotic after disk recovery.
+2. **Perceptual** — perceptual hashing to catch recompression, resizing, and screenshots of the same photo, which the exact pass misses.
 
-## O custo do erro define o desenho
+## The cost of a mistake drives the design
 
-Apagar o original é irreversível. Por isso:
+Deleting the original is irreversible. So:
 
-- O motor **isola**, não apaga. A remoção é sempre um segundo passo, explícito.
-- O representante do grupo é o de metadado de criação mais antigo, e a escolha é registrada com o motivo.
-- Exceção de arquivo bloqueado ou permissão negada não derruba a varredura global.
+- The engine **isolates**, it never deletes. Removal is always a separate, explicit second step.
+- The group's representative is the one with the oldest creation metadata, and the choice is recorded along with the reason.
+- A locked-file or permission-denied exception doesn't bring down the whole scan.
 
-## Dois destinos, por grau de certeza
+## Two destinations, by confidence level
 
-O que a passada exata acha e o que a perceptual acha não têm o mesmo grau de confiança, e por isso não vão para o mesmo lugar:
+What the exact pass finds and what the perceptual pass finds don't carry the same confidence, so they don't go to the same place:
 
-| origem | destino | por quê |
+| source | destination | why |
 |---|---|---|
-| grupo **exato** | `quarentena` | Os bytes são idênticos. Ou o SHA-256 bate ou não bate — não há falso positivo possível. |
-| grupo **perceptual** | `revisao` | Veio de semelhança, que erra. Pode ser foto única. Fila de decisão humana, nunca descarte automático. |
+| **exact** group | `quarentena` | The bytes are identical. Either the SHA-256 matches or it doesn't — no false positive is possible. |
+| **perceptual** group | `revisao` | Comes from similarity, which can be wrong. Could be a one-of-a-kind photo. A human-decision queue, never automatic discard. |
 
-A separação é estrutural de propósito. Numa medição real numa pasta de referência facial, **4 de 11 candidatos perceptuais eram uma rajada** de fotos distintas — mesma pose, instantes e enquadramentos diferentes — e não cópias. Apertar o limiar de distância não resolveria: a rajada media distância 2, dentro de qualquer corte defensável. Limiar escolhido para fazer um caso específico passar é chute; separar por grau de certeza é garantia.
+The split is structural, by design. In a real measurement on a facial-reference folder, **4 of 11 perceptual candidates were a burst** of distinct photos — same pose, different instants and framing — not copies. Tightening the distance threshold wouldn't have fixed it: the burst measured a distance of 2, within any defensible cutoff. A threshold picked to make one specific case pass is a guess; splitting by confidence level is a guarantee.
 
-`isolar --somente quarentena` move só o descarte seguro, sem tocar na fila de revisão.
+`isolar --somente quarentena` moves only the safe-to-discard set, without touching the review queue.
 
-## Saída
+## Output
 
-Grava na tabela `duplicatas` do `acervo`. Também exporta relatório JSON com `duplicate_groups`, espaço recuperável e o representante de cada grupo.
+Writes to the `duplicatas` table of `acervo`. Also exports a JSON report with `duplicate_groups`, recoverable space, and each group's representative.
 
 ## Interface
 
-Janela nativa do Windows (WebView2, o runtime do Edge que já vem no Windows 11), servida por um servidor local que **só escuta em `127.0.0.1`**, com token de sessão gerado a cada início. Nada trafega para fora da máquina.
+Native Windows window (WebView2, the Edge runtime that ships with Windows 11), served by a local server that **only listens on `127.0.0.1`**, with a session token generated on every start. Nothing leaves the machine.
 
-A interface é uma **casca**: ela não contém nenhuma regra de detecção, de escolha de representante ou de destino. Ela executa `scan` e `isolar` como subprocesso e transmite o `stdout` deles ao vivo. Apagar a pasta `src/acervo_dedup/gui/` inteira não muda um bit do resultado do motor.
+The interface is a **shell**: it contains no detection, representative-selection, or destination logic. It runs `scan` and `isolar` as a subprocess and streams their `stdout` live. Deleting the entire `src/acervo_dedup/gui/` folder wouldn't change a single bit of the engine's output.
 
-O invariante "isola, nunca apaga" é o que a tela desenha:
+The "isolate, never delete" invariant is what the screen renders:
 
-- **Não existe botão de apagar** em lugar nenhum da interface.
-- `isolar` abre sempre em **dry-run**. Mover de fato exige digitar `ISOLAR` num diálogo que diz quantos arquivos e para onde.
-- **Cor é semântica, não decoração.** A paleta vem de *Operários* (Tarsila do Amaral, 1933): ocre = certeza (cópia byte-idêntica, descarte seguro), terracota = semelhança (pode errar, decisão humana), tijolo = ação irreversível, céu = informação neutra.
+- **There is no delete button** anywhere in the interface.
+- `isolar` always opens in **dry-run**. Actually moving files requires typing `ISOLAR` into a dialog that states how many files and where.
+- **Color is semantic, not decoration.** The palette comes from *Operários* (Tarsila do Amaral, 1933): ochre = certainty (byte-identical copy, safe discard), terracotta = similarity (fallible, human decision), brick = irreversible action, sky = neutral information.
 
-Quatro etapas, na ordem em que o erro fica mais caro: **Varredura → Resultado → Conferência → Isolar**. As três últimas ficam travadas até existir relatório.
+Four steps, in order of increasing cost of error: **Scan → Result → Review → Isolate** (`Varredura → Resultado → Conferência → Isolar` in the interface, which stays in Portuguese — see [Language](CONTRIBUTING.md)). The last three stay locked until a report exists.
 
-## Instalação
+## Installation
 
-Requer **Windows 10/11 com o runtime WebView2** (já vem instalado no Windows 11) para a janela nativa. Para rodar do código-fonte ou usar só o CLI, requer **Python 3.10 ou mais novo**. Testado no Windows 11 com Python 3.14.
+Requires **Windows 10/11 with the WebView2 runtime** (already installed on Windows 11) for the native window. To run from source or use just the CLI, requires **Python 3.10 or newer**. Tested on Windows 11 with Python 3.14.
 
-São **dois programas**, e a ordem importa: `acervo` varre o disco, calcula SHA-256 e hash perceptual, e escreve o índice; `acervo-dedup` lê esse índice e decide o que é duplicata. A divisão existe para a imagem ser decodificada **uma vez só** pela suíte inteira — por isso `acervo-dedup` não depende de Pillow: ele lê `phash` do banco em vez de reabrir a foto.
+There are **two programs**, and the order matters: `acervo` scans the disk, computes SHA-256 and a perceptual hash, and writes the index; `acervo-dedup` reads that index and decides what's a duplicate. The split exists so the image gets decoded **exactly once** across the whole suite — that's why `acervo-dedup` has no dependency on Pillow: it reads `phash` from the database instead of reopening the photo.
 
-### Opção A — executável (uso normal)
+### Option A — executable (normal use)
 
-Descompacte `acervo-dedup-windows.zip` numa pasta e dê **duplo clique em `acervo-dedup-gui.exe`**. Não há instalador, não há registro no sistema, não há serviço em segundo plano: apagar a pasta desinstala.
+Unzip `acervo-dedup-windows.zip` into a folder and **double-click `acervo-dedup-gui.exe`**. No installer, no registry entries, no background service: deleting the folder uninstalls it.
 
-A pasta traz **dois binários**, e os dois são necessários:
+The folder ships **two binaries**, and both are required:
 
-| binário | subsistema | papel |
+| binary | subsystem | role |
 |---|---|---|
-| `acervo-dedup-gui.exe` | janela | é o que você abre; não mostra console |
-| `acervo-dedup.exe` | console | é o motor; a janela o executa e lê o `stdout` dele para o log ao vivo |
+| `acervo-dedup-gui.exe` | windowed | the one you open; shows no console |
+| `acervo-dedup.exe` | console | the engine; the window runs it and reads its `stdout` for the live log |
 
-Não separe os dois nem renomeie o segundo — a janela procura `acervo-dedup.exe` ao lado dela.
+Don't separate the two or rename the second one — the window looks for `acervo-dedup.exe` right next to itself.
 
-### Opção B — do código-fonte
+### Option B — from source
 
-Os dois repositórios são **privados** (código fechado, Obsn Studios): o `clone` exige credencial com acesso.
+Both repositories are **private** (closed source, Obsn Studios): cloning requires a credential with access.
 
 ```bash
 git clone https://github.com/ferlief/acervo.git
 git clone https://github.com/ferlief/acervo-dedup.git
 ```
 
-Use um ambiente virtual — instalar pacote em Python global é como escrever direto no acervo: funciona até o dia em que outro projeto pede outra versão.
+Use a virtual environment — installing a package into the global Python is like writing straight into the acervo: it works until the day another project needs a different version.
 
 ```bash
 python -m venv .venv
@@ -85,105 +85,110 @@ pip install -e ./acervo
 pip install -e "./acervo-dedup[gui]"
 ```
 
-O extra `[gui]` traz o `pywebview` (a janela nativa). Sem ele o motor e o CLI funcionam igual, e `gui` cai para o navegador — a dependência de janela é opcional de propósito: uma varredura de HD externo por SSH não precisa de toolkit gráfico instalado.
+The `[gui]` extra brings in `pywebview` (the native window). Without it the engine and CLI work the same, and `gui` falls back to the browser — the window dependency is optional on purpose: scanning an external drive over SSH shouldn't need a graphical toolkit installed.
 
-Confirme que instalou:
+Confirm it installed:
 
 ```bash
 python -m acervo.cli --help
 python -m acervo_dedup.cli --help
 ```
 
-**No Windows, `pip` costuma avisar que a pasta `Scripts` não está no PATH.** Se `acervo-dedup` não for reconhecido como comando, use a forma `python -m acervo_dedup.cli ...` — funciona sempre, sem mexer no PATH. Todos os exemplos abaixo usam essa forma.
+**On Windows, `pip` often warns that the `Scripts` folder isn't on PATH.** If `acervo-dedup` isn't recognized as a command, use the `python -m acervo_dedup.cli ...` form instead — it always works, without touching PATH. All examples below use that form.
 
-### Gerar o executável
+### Building the executable
 
 ```bash
 pip install -e ".[build]"
 python -m PyInstaller --noconfirm --clean packaging/acervo-dedup.spec
 ```
 
-Sai em `dist/acervo-dedup/` (~36 MB). É `onedir`, não `onefile`, de propósito: a janela executa o CLI uma vez por varredura, e um `onefile` reextrairia o pacote inteiro para uma pasta temporária a cada execução.
+Lands in `dist/acervo-dedup/` (~36 MB). It's `onedir`, not `onefile`, on purpose: the window runs the CLI once per scan, and a `onefile` build would re-extract the whole package to a temp folder on every run.
 
-## Uso pela interface
+## Using the interface
 
-Abra `acervo-dedup-gui.exe`. As quatro etapas do trilho lateral são a ordem correta, e cada uma só destrava quando a anterior produziu resultado:
+Open `acervo-dedup-gui.exe`. The four steps in the side rail are the correct order, and each one only unlocks once the previous produced a result:
 
-1. **Varredura** — informe as raízes (ou deixe vazio para usar a config) e clique em *Iniciar varredura*. A saída do motor aparece linha a linha. Nada é movido nesta etapa.
-2. **Resultado** — quanto dá para recuperar, separado em `quarentena` (cópia byte-idêntica) e `revisao` (parecida). Erros de leitura ficam listados aqui, não escondidos.
-3. **Conferência** — grupo a grupo, com o representante, o motivo da escolha e a distância de cada candidato. Filtre por método, ordene por espaço, busque por caminho ou `sha256`. **Vale conferir a olho os grupos perceptuais** — são os falíveis.
-4. **Isolar** — comece por *Simular*. Se a lista fizer sentido, *Mover de fato* pede a palavra `ISOLAR` digitada.
+1. **Scan** (`Varredura`) — enter the roots (or leave blank to use the config) and click *Iniciar varredura*. The engine's output appears line by line. Nothing is moved at this step.
 
-Para apontar outra configuração, abra pelo terminal:
+   > **If a red error about a missing database shows up:** `acervo` needs to run first. The two programs work as a pair — `acervo` looks at the photos and writes down what it saw; `acervo-dedup` reads those notes. Without the first part, the second has nothing to read.
+
+2. **Result** (`Resultado`) — how much space can be recovered, split into `quarentena` (byte-identical copy) and `revisao` (similar). Read errors are listed here, not hidden.
+
+3. **Review** (`Conferência`) — group by group, with the representative, the reason for the choice, and each candidate's distance. Filter by method, sort by space, search by path or `sha256`. **It's worth eyeballing the perceptual groups** — those are the fallible ones.
+
+4. **Isolate** (`Isolar`) — start with *Simular* (simulate). If the list makes sense, *Mover de fato* (actually move) requires typing the word `ISOLAR`.
+
+To point to a different config, open it from the terminal:
 
 ```bash
 acervo-dedup-gui.exe --config dedup-config.yaml
 ```
 
-## Uso pelo CLI
+## Using the CLI
 
-O mesmo motor, sem janela. É o caminho para automação, máquina remota e scripts.
+The same engine, without the window. This is the path for automation, remote machines, and scripts.
 
-### 1. Configurar
+### 1. Configure
 
 ```bash
 cp acervo/config.example.yaml acervo-config.yaml
 cp acervo-dedup/config.example.yaml dedup-config.yaml
 ```
 
-Nos dois arquivos, aponte `banco.caminho` para o **mesmo** `.sqlite3` — é ele que liga os dois programas — e `varredura.raizes` para a pasta a limpar. Em `dedup-config.yaml`, confira também `quarentena.diretorio` e `revisao.diretorio`.
+In both files, point `banco.caminho` to the **same** `.sqlite3` — that's what links the two programs together — and `varredura.raizes` to the folder to clean up. In `dedup-config.yaml`, also check `quarentena.diretorio` and `revisao.diretorio`.
 
-Nenhum caminho é fixo no código: a mesma linha de comando roda contra uma pasta de teste ou contra o acervo inteiro, trocando só a config.
+No path is hardcoded: the same command line runs against a test folder or the entire acervo, just by swapping the config.
 
-### 2. Indexar
+### 2. Index
 
 ```bash
 python -m acervo.cli --config acervo-config.yaml indexar
 ```
 
-Varre, hasheia e decodifica cada imagem uma vez. Só isso demora — as etapas seguintes são rápidas.
+Scans, hashes, and decodes each image once. This is the only slow part — the following steps are fast.
 
-### 3. Detectar
+### 3. Detect
 
 ```bash
 python -m acervo_dedup.cli --config dedup-config.yaml scan
 ```
 
-**Não move nada.** Grava a tabela `duplicatas` e o relatório JSON, e imprime quanto espaço é recuperável, separado por grau de certeza.
+**Moves nothing.** Writes the `duplicatas` table and the JSON report, and prints how much space is recoverable, split by confidence level.
 
-### 4. Conferir antes de mexer
+### 4. Review before touching anything
 
-Abra o relatório JSON. Cada grupo traz o representante (o que fica), o motivo da escolha, e os candidatos com seu `destino`. Vale conferir a olho os grupos `perceptual` — são os falíveis.
+Open the JSON report. Each group carries the representative (the one that stays), the reason for the choice, and the candidates with their `destino`. It's worth eyeballing the `perceptual` groups — those are the fallible ones.
 
-### 5. Isolar o descarte seguro
+### 5. Isolate the safe discard set
 
-Primeiro em dry-run, que é o padrão:
+First in dry-run, which is the default:
 
 ```bash
 python -m acervo_dedup.cli --config dedup-config.yaml isolar --somente quarentena
 ```
 
-Se a lista fizer sentido, execute:
+If the list makes sense, run:
 
 ```bash
 python -m acervo_dedup.cli --config dedup-config.yaml isolar --somente quarentena --execute
 ```
 
-Move só as cópias byte-idênticas. A estrutura de subpastas é preservada, e nada é sobrescrito (colisão de nome ganha sufixo `_dup1`).
+Moves only the byte-identical copies. The subfolder structure is preserved, and nothing is overwritten (a name collision gets a `_dup1` suffix).
 
-### 6. Decidir sobre as parecidas
+### 6. Decide on the similar ones
 
 ```bash
 python -m acervo_dedup.cli --config dedup-config.yaml isolar --somente revisao --execute
 ```
 
-Isso **não é descarte** — é fila de decisão. Olhe a pasta `revisao` e devolva para o acervo o que for foto única.
+This is **not discard** — it's a decision queue. Look through the `revisao` folder and return to the acervo whatever turns out to be a one-of-a-kind photo.
 
-### 7. Apagar — só você
+### 7. Deleting — only you
 
-O programa nunca apaga. Depois de conferir a quarentena, apagar a pasta é uma escolha sua, fora da ferramenta. É esse passo que recupera o espaço em disco.
+The program never deletes. After reviewing the quarantine, deleting the folder is your own choice, outside the tool. That's the step that actually recovers disk space.
 
-## Desenvolvimento
+## Development
 
 ```bash
 python -m venv .venv
@@ -191,29 +196,29 @@ python -m venv .venv
 python -m unittest discover -s tests
 ```
 
-A suíte cobre a política de representante, os dois agrupamentos, o roteamento entre os dois destinos e um teste de ponta a ponta com disco e SQLite reais. **Qualquer mudança em `quality.py` ou `quarantine.py` roda a suíte antes do commit, não depois** — é onde o erro custa dado perdido.
+The suite covers the representative policy, both groupings, routing between the two destinations, and an end-to-end test against real disk and SQLite. **Any change to `quality.py` or `quarantine.py` runs the suite before the commit, not after** — that's where a mistake costs lost data.
 
-Convenções (detalhe em `CONTRIBUTING.md`):
+Conventions (details in `CONTRIBUTING.md`):
 
-- **Commits em inglês**, Conventional Commits, modo imperativo.
-- **Comentários e docstrings em inglês.** Identificadores e texto de interface continuam em português.
-- A camada `gui/` não pode importar `exact`, `perceptual`, `quality` nem `quarantine`. Se precisar, a regra está no lugar errado.
+- **Commits in English**, Conventional Commits, imperative mood.
+- **Comments and docstrings in English.** Identifiers and interface text stay in Portuguese.
+- The `gui/` layer can't import `exact`, `perceptual`, `quality`, or `quarantine`. If it needs to, the rule is in the wrong place.
 
-## Estado
+## Status
 
-**Implementado.** Motor em Python (`src/acervo_dedup/`), portado das oito iterações do protótipo de origem (`acervo-prototipo/dedup_fase1.py` … `dedup_fase8.py`), não copiado — a passada exata e a perceptual usam a mesma lógica testada em disco real (triagem por tamanho, SHA-256 em blocos, hash perceptual com indexação multi-partição/LSH, guarda de proporção), adaptada ao contrato de `acervo/esquema.sql`.
+**Implemented.** Engine in Python (`src/acervo_dedup/`), ported from the eight iterations of the source prototype (`acervo-prototipo/dedup_fase1.py` … `dedup_fase8.py`), not copied — the exact and perceptual passes use the same logic already tested against real disk data (size screening, block-wise SHA-256, perceptual hashing with multi-partition/LSH indexing, aspect-ratio guard), adapted to the `acervo/esquema.sql` contract.
 
-Duas diferenças deliberadas em relação ao protótipo, exigidas pelo contrato da suite:
+Two deliberate differences from the prototype, required by the suite's contract:
 
-- A passada perceptual **lê** `phash`/`largura`/`altura` de `arquivos` em vez de reabrir a imagem — é o próprio propósito de `sinais(fonte=exif)` no esquema: dar a este programa o que ele precisa sem redecodificar.
-- A política de representante é mais específica que a descrita acima: grupo exato usa a data de criação mais antiga; grupo perceptual usa qualidade mensurável (RAW > resolução > original-vs-edição via EXIF Software > menor perda de compressão via soma de quantização JPEG), com desempate por data. Ver `src/acervo_dedup/quality.py`.
+- The perceptual pass **reads** `phash`/`largura`/`altura` from `arquivos` instead of reopening the image — that's the whole point of `sinais(fonte=exif)` in the schema: giving this program what it needs without re-decoding.
+- The representative policy is more specific than described above: the exact group uses the oldest creation date; the perceptual group uses measurable quality (RAW > resolution > original-vs-edited via EXIF Software > lowest compression loss via JPEG quantization sum), tie-broken by date. See `src/acervo_dedup/quality.py`.
 
-Comandos: `acervo-dedup scan` (detecta e grava relatório + `duplicatas`, nunca move nada), `acervo-dedup isolar` (move para `quarentena`/`revisao` conforme o grau de certeza, dry-run por padrão, `--execute` para mover de fato, `--somente` para tratar uma classe por vez) e `acervo-dedup gui` (janela nativa; `--navegador` força a aba do navegador).
+Commands: `acervo-dedup scan` (detects and writes the report + `duplicatas`, never moves anything), `acervo-dedup isolar` (moves to `quarentena`/`revisao` according to confidence level, dry-run by default, `--execute` to actually move, `--somente` to handle one class at a time), and `acervo-dedup gui` (native window; `--navegador` forces the browser tab).
 
-A interface gráfica (`src/acervo_dedup/gui/`) é posterior ao motor e não o alterou: ela executa os dois comandos acima como subprocesso. O empacotamento para Windows está em `packaging/`.
+The graphical interface (`src/acervo_dedup/gui/`) came after the engine and didn't change it: it runs the two commands above as a subprocess. Windows packaging lives in `packaging/`.
 
-## Licença e monetização
+## License and monetization
 
-Código fechado, sob Obsn Studios.
+Closed source, under Obsn Studios.
 
-Gratuito para uso pessoal local, sem limite artificial. Licença comercial simbólica por honra para uso profissional, no modelo Obsidian. Sem paywall agressivo, sem assinatura recorrente.
+Free for local personal use, no artificial limit. A symbolic honor-based commercial license for professional use, Obsidian-style. No aggressive paywall, no recurring subscription.
