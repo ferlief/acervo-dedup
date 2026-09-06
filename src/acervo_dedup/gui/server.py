@@ -42,11 +42,13 @@ LIMITE_LINHAS = 4000          # log history kept in memory
 CANDIDATOS_POR_GRUPO = 120    # per-group cap sent to the browser
 POR_PAGINA_MAX = 200
 
-# Name of the console CLI binary shipped next to the windowed one. The
-# windowed build has no console, so its stdout is not a pipe Python can
+# Name of the console CLI binary shipped next to the windowed one. On Windows
+# the windowed build has no console, so its stdout is not a pipe Python can
 # write to - and the live log is precisely that stdout. The window therefore
-# always drives its console sibling.
-CLI_CONGELADO = "acervo-dedup.exe"
+# always drives its console sibling. Linux and macOS have no windowed/console
+# subsystem split, so the sibling is the same binary minus the extension; the
+# indirection still holds there and keeps one code path for both.
+CLI_CONGELADO = "acervo-dedup.exe" if os.name == "nt" else "acervo-dedup"
 
 
 def executavel_do_motor() -> str:
@@ -591,6 +593,19 @@ def servir_em_thread(servico: Servico) -> threading.Thread:
     return t
 
 
+def _abrir_navegador(url: str) -> None:
+    """webbrowser.open reports success the moment it hands the URL to a
+    helper (gio, xdg-open), even when that helper then fails - the normal
+    case on a minimal Linux box, and always under WSL. There is no reliable
+    signal to branch on, so this never claims the browser opened; the caller
+    prints the address unconditionally and says to copy it if nothing
+    appeared."""
+    try:
+        webbrowser.open(url)
+    except Exception:  # noqa: BLE001 - having no browser is not fatal
+        pass
+
+
 def servir(config_path: str | None, porta: int = 8765, abrir: bool = True) -> int:
     """Browser mode: this process serves until Ctrl+C."""
     servico = montar(config_path, porta)
@@ -601,7 +616,8 @@ def servir(config_path: str | None, porta: int = 8765, abrir: bool = True) -> in
     print(f"  {servico.url}", flush=True)
     print("  Ouvindo so' em 127.0.0.1. Ctrl+C para encerrar.\n", flush=True)
     if abrir:
-        threading.Timer(0.4, webbrowser.open, args=(servico.url,)).start()
+        print("  Se o navegador nao abrir sozinho, copie o endereco acima.", flush=True)
+        threading.Timer(0.4, _abrir_navegador, args=(servico.url,)).start()
     try:
         servico.servidor.serve_forever()
     except KeyboardInterrupt:

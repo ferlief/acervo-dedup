@@ -3,7 +3,12 @@
 Este arquivo é o passo a passo sem jargão. Se algo aqui não bater com o que
 você vê na tela, é o arquivo que está errado, não você.
 
+A primeira metade é Windows. Se você está no **Linux**, pule direto para
+[No Linux](#no-linux) — a instalação é diferente, mas a tela é a mesma.
+
 ---
+
+# No Windows
 
 ## O jeito mais curto
 
@@ -59,7 +64,92 @@ assim mesmo**.
 
 ---
 
-## O que fazer depois que a janela abrir
+# No Linux
+
+No Linux não tem `.exe` para clicar. Você instala uma vez pelo terminal, e
+depois o programa aparece no menu de aplicativos como qualquer outro.
+
+## Passo 1 — as bibliotecas da janela
+
+A janela usa uma peça do sistema chamada **WebKit2GTK**. Ela não vem junto
+com o programa e não dá para instalar com `pip`: é do sistema. Cole a linha
+da sua distribuição:
+
+```bash
+# Ubuntu, Debian, Mint, Pop!_OS
+sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.1
+
+# Fedora
+sudo dnf install python3-gobject gtk3 webkit2gtk4.1
+
+# Arch, Manjaro
+sudo pacman -S python-gobject gtk3 webkit2gtk-4.1
+```
+
+Ele vai pedir sua senha — é o `sudo`, normal. Se der erro dizendo que
+`gir1.2-webkit2-4.1` não existe, sua distribuição é mais antiga: troque o
+final para `gir1.2-webkit2-4.0`.
+
+**Pode pular este passo.** O programa funciona sem ele — só abre numa aba do
+navegador em vez de janela própria. Tudo o mais é idêntico.
+
+## Passo 2 — instalar
+
+```bash
+git clone https://github.com/ferlief/acervo-dedup.git
+cd acervo-dedup
+bash packaging/linux/instalar.sh
+```
+
+O script fala o que está fazendo e termina imprimindo como abrir. Ele não
+pede senha, não escreve nada fora da sua pasta pessoal, e diz no fim quais
+duas pastas apagar se você quiser desinstalar.
+
+## Passo 3 — abrir
+
+Procure por **acervo-dedup** no menu de aplicativos. Se preferir o terminal:
+
+```bash
+~/.local/share/acervo-dedup/venv/bin/acervo-dedup gui
+```
+
+## Se abrir um endereço em vez de uma janela
+
+Você vai ver algo assim:
+
+```
+[AVISO] Nao foi possivel abrir a janela nativa (...).
+        Caindo para o navegador.
+acervo-dedup - interface local
+  http://127.0.0.1:8765/?t=xxxxxxxx
+```
+
+**Isso não é erro.** Faltou o WebKit2GTK do passo 1. Copie o endereço
+`http://127.0.0.1:...` inteiro — **com a parte do `?t=`**, que é a chave da
+sessão — e cole no navegador. A tela é exatamente a mesma.
+
+## Três coisas que dão errado no Linux
+
+**1. Criar o ambiente sem `--system-site-packages`.**
+Se você instalou na mão em vez de usar o script: o `python3 -m venv .venv`
+comum não enxerga o `gi` que veio do `apt`. A janela nunca abre, por mais
+pacote de sistema que você instale. Tem que ser
+`python3 -m venv --system-site-packages .venv`.
+
+**2. Rodar por SSH sem tela.**
+Numa máquina remota não existe janela para abrir. Use
+`acervo-dedup gui --navegador` e faça um túnel da porta, ou use o CLI direto.
+
+**3. Achar que precisa de `sudo` para o programa.**
+Só o passo 1 usa `sudo`, e é para instalar bibliotecas do sistema. O
+`acervo-dedup` roda como você, e é assim que tem que ser: ele mexe nos seus
+arquivos, não nos do sistema.
+
+---
+
+# Depois que a janela abrir
+
+Vale para Windows e Linux — a tela é a mesma.
 
 A lateral tem quatro etapas. **As três últimas ficam apagadas até a primeira
 terminar** — é de propósito, para não ter como fazer fora de ordem.
@@ -107,3 +197,6 @@ conferir, é uma decisão sua, fora do programa.
 
 Feche a janela no X. O programa encerra junto — não fica nada rodando
 escondido.
+
+Se você estiver usando pela aba do navegador, fechar a aba **não** encerra:
+volte no terminal onde ele está rodando e aperte `Ctrl+C`.

@@ -1,6 +1,6 @@
 # acervo-dedup
 
-Redundancy detection in large photo collections. Windows desktop app, with the same engine exposed as a CLI.
+Redundancy detection in large photo collections. Desktop app on Windows and Linux, with the same engine exposed as a CLI.
 
 Answers **one** question: *are these files the same content?*
 
@@ -36,7 +36,9 @@ Writes to the `duplicatas` table of `acervo`. Also exports a JSON report with `d
 
 ## Interface
 
-Native Windows window (WebView2, the Edge runtime that ships with Windows 11), served by a local server that **only listens on `127.0.0.1`**, with a session token generated on every start. Nothing leaves the machine.
+A native window — WebView2 on Windows (the Edge runtime that ships with Windows 11), WebKit2GTK on Linux — served by a local server that **only listens on `127.0.0.1`**, with a session token generated on every start. Nothing leaves the machine.
+
+The window is a shell around a page, so where no toolkit is available the same interface opens in a browser tab instead (`--navegador`). That path is not a degraded mode kept for emergencies: it is verified by the same test suite and is the sensible way to drive a scan over SSH.
 
 The interface is a **shell**: it contains no detection, representative-selection, or destination logic. It runs `scan` and `isolar` as a subprocess and streams their `stdout` live. Deleting the entire `src/acervo_dedup/gui/` folder wouldn't change a single bit of the engine's output.
 
@@ -50,11 +52,16 @@ Four steps, in order of increasing cost of error: **Scan → Result → Review �
 
 ## Installation
 
-Requires **Windows 10/11 with the WebView2 runtime** (already installed on Windows 11) for the native window. To run from source or use just the CLI, requires **Python 3.10 or newer**. Tested on Windows 11 with Python 3.14.
+| | native window needs | engine and CLI need |
+|---|---|---|
+| **Windows** | WebView2 runtime — preinstalled on Windows 11 | Python 3.10+ (only when running from source) |
+| **Linux** | WebKit2GTK + PyGObject, from your distro's packages | Python 3.10+ |
+
+Verified on Windows 11 with Python 3.14, and on Ubuntu (WSL2) with Python 3.14. On Linux, no toolkit at all is still a working install: the interface opens in the browser.
 
 There are **two programs**, and the order matters: `acervo` scans the disk, computes SHA-256 and a perceptual hash, and writes the index; `acervo-dedup` reads that index and decides what's a duplicate. The split exists so the image gets decoded **exactly once** across the whole suite — that's why `acervo-dedup` has no dependency on Pillow: it reads `phash` from the database instead of reopening the photo.
 
-### Option A — executable (normal use)
+### Windows — executable (normal use)
 
 Unzip `acervo-dedup-windows.zip` into a folder and **double-click `acervo-dedup-gui.exe`**. No installer, no registry entries, no background service: deleting the folder uninstalls it.
 
@@ -67,7 +74,7 @@ The folder ships **two binaries**, and both are required:
 
 Don't separate the two or rename the second one — the window looks for `acervo-dedup.exe` right next to itself.
 
-### Option B — from source
+### Windows — from source
 
 Both repositories are **private** (closed source, Obsn Studios): cloning requires a credential with access.
 
@@ -96,7 +103,53 @@ python -m acervo_dedup.cli --help
 
 **On Windows, `pip` often warns that the `Scripts` folder isn't on PATH.** If `acervo-dedup` isn't recognized as a command, use the `python -m acervo_dedup.cli ...` form instead — it always works, without touching PATH. All examples below use that form.
 
-### Building the executable
+### Linux — install script (normal use)
+
+First, the system packages the native window needs. They are **not** available as wheels — WebKit2GTK is a C library with GObject introspection data, and no `pip install` substitutes for it:
+
+```bash
+# Debian, Ubuntu, Mint
+sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.1
+
+# Fedora
+sudo dnf install python3-gobject gtk3 webkit2gtk4.1
+
+# Arch
+sudo pacman -S python-gobject gtk3 webkit2gtk-4.1
+```
+
+On distros older than Ubuntu 24.04, the package is `gir1.2-webkit2-4.0`. The installer accepts either.
+
+Then:
+
+```bash
+git clone https://github.com/ferlief/acervo-dedup.git
+cd acervo-dedup
+bash packaging/linux/instalar.sh
+```
+
+The script creates a virtualenv under `~/.local/share/acervo-dedup/`, installs the package into it, and registers a `.desktop` entry so **acervo-dedup** appears in the application menu. Nothing is written outside `$HOME` and it never asks for `sudo`. Uninstalling is deleting the two paths it prints at the end.
+
+If WebKit2GTK is missing, the script says so, names the package for your distro, and installs anyway — you get the browser interface until you install it and re-run.
+
+### Linux — manual, if you prefer
+
+The one non-obvious flag is `--system-site-packages`. `gi` (PyGObject) is installed by the distro, never by pip, and a sealed virtualenv cannot see it — leave the flag out and the native window is unreachable no matter which system packages you have:
+
+```bash
+python3 -m venv --system-site-packages .venv
+source .venv/bin/activate
+pip install -e ../acervo
+pip install -e ".[gui]"
+
+acervo-dedup gui
+```
+
+### Why there is no Linux executable
+
+Windows gets a `.zip` with two binaries because a PyInstaller bundle there is portable across machines. On Linux it isn't: the bundle links against the glibc, and against the WebKit build, of whichever machine produced it, so a binary built on Ubuntu 24.04 fails on Debian 12 with an error about a symbol version. A virtualenv plus a `.desktop` file is what a distro package would have produced anyway, without the false promise of portability.
+
+### Building the Windows executable
 
 ```bash
 pip install -e ".[build]"
@@ -107,7 +160,9 @@ Lands in `dist/acervo-dedup/` (~36 MB). It's `onedir`, not `onefile`, on purpose
 
 ## Using the interface
 
-Open `acervo-dedup-gui.exe`. The four steps in the side rail are the correct order, and each one only unlocks once the previous produced a result:
+On Windows, open `acervo-dedup-gui.exe`. On Linux, pick **acervo-dedup** from the application menu, or run `acervo-dedup gui`. Same interface either way.
+
+The four steps in the side rail are the correct order, and each one only unlocks once the previous produced a result:
 
 1. **Scan** (`Varredura`) — enter the roots (or leave blank to use the config) and click *Iniciar varredura*. The engine's output appears line by line. Nothing is moved at this step.
 
@@ -122,8 +177,11 @@ Open `acervo-dedup-gui.exe`. The four steps in the side rail are the correct ord
 To point to a different config, open it from the terminal:
 
 ```bash
-acervo-dedup-gui.exe --config dedup-config.yaml
+acervo-dedup-gui.exe --config dedup-config.yaml    # Windows
+acervo-dedup --config dedup-config.yaml gui        # Linux
 ```
+
+Add `--navegador` to either one to open in a browser tab instead of a window.
 
 ## Using the CLI
 
@@ -191,12 +249,22 @@ The program never deletes. After reviewing the quarantine, deleting the folder i
 ## Development
 
 ```bash
+# Windows
 python -m venv .venv
 .venv/Scripts/python.exe -m pip install -e ".[build]"
+
+# Linux
+python3 -m venv --system-site-packages .venv
+.venv/bin/python -m pip install -e ".[gui]"
+```
+
+```bash
 python -m unittest discover -s tests
 ```
 
-The suite covers the representative policy, both groupings, routing between the two destinations, and an end-to-end test against real disk and SQLite. **Any change to `quality.py` or `quarantine.py` runs the suite before the commit, not after** — that's where a mistake costs lost data.
+The suite covers the representative policy, both groupings, routing between the two destinations, and an end-to-end test against real disk and SQLite. It has no platform-specific branches and passes identically on both. **Any change to `quality.py` or `quarantine.py` runs the suite before the commit, not after** — that's where a mistake costs lost data.
+
+`[build]` only matters on Windows: it pulls PyInstaller, and the only executable this project ships is the Windows one.
 
 Conventions (details in `CONTRIBUTING.md`):
 

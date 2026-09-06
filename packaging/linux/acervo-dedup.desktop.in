@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=acervo-dedup
+GenericName=Duplicate photo detection
+Comment=Encontra fotos duplicadas no acervo e isola, nunca apaga
+Exec=__EXEC__
+Icon=__ICON__
+Terminal=false
+Categories=Utility;Graphics;Photography;
+Keywords=duplicata;duplicate;foto;photo;acervo;dedup;
+StartupNotify=true
+StartupWMClass=acervo-dedup

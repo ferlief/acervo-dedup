@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- The three chimneys of "Operarios" (Tarsila do Amaral, 1933), reduced
+       to bars, on the ochre that means "certain" everywhere in this app. -->
+  <rect width="64" height="64" rx="14" fill="#d3a03f"/>
+  <rect x="12" y="34" width="8" height="20" fill="#17130f"/>
+  <rect x="28" y="26" width="8" height="28" fill="#17130f"/>
+  <rect x="44" y="38" width="8" height="16" fill="#17130f"/>
+</svg>
